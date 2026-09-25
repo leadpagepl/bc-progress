@@ -1,0 +1,136 @@
+@import "tailwindcss";
+
+@theme {
+  --color-graphite: #191a19;
+  --color-ink: #0e0f0e;
+  --color-bone: #f5f3ec;
+  --color-bone-2: #eae7dd;
+  --color-yellow: #ffd21c;
+  --color-grey: #8e908a;
+
+  --font-display: var(--font-archivo), "Arial Black", sans-serif;
+  --font-sans: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
+
+  --spacing-gutter: clamp(1.25rem, 4vw, 4.5rem);
+
+  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@layer base {
+  :root {
+    --rule: color-mix(in srgb, var(--color-graphite) 14%, transparent);
+    --rule-dark: color-mix(in srgb, var(--color-bone) 16%, transparent);
+    color-scheme: light;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: var(--color-bone);
+    color: var(--color-graphite);
+    font-family: var(--font-sans);
+    font-feature-settings: "ss01", "cv05";
+    -webkit-font-smoothing: antialiased;
+    overflow-x: clip;
+  }
+
+  ::selection {
+    background: var(--color-yellow);
+    color: var(--color-graphite);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-yellow);
+    outline-offset: 3px;
+  }
+
+  h1, h2, h3, h4 {
+    font-family: var(--font-display);
+    font-weight: 800;
+    letter-spacing: -0.035em;
+    line-height: 0.92;
+    text-transform: uppercase;
+    text-wrap: balance;
+  }
+}
+
+@utility gut {
+  padding-inline: var(--spacing-gutter);
+}
+
+/* Wyjście kadru na pełną szerokość i powrót do siatki tekstu. */
+@utility -mx-gutter {
+  margin-inline: calc(var(--spacing-gutter) * -1);
+}
+
+@utility px-gutter {
+  padding-inline: var(--spacing-gutter);
+}
+
+/* ---- Editorial primitives -------------------------------------------- */
+
+/* Label / eyebrow: the only place tracking goes wide. */
+@utility eyebrow {
+  font-family: var(--font-sans);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  line-height: 1;
+}
+
+/* Masked line reveal. The mask lives on .line-mask, the motion on .line-inner.
+   Only GSAP (or the CSS fallback below) ever touches .line-inner transform. */
+.line-mask {
+  display: block;
+  overflow: hidden;
+  padding-bottom: 0.08em;
+  margin-bottom: -0.08em;
+}
+.line-inner {
+  display: block;
+  will-change: transform;
+}
+
+/* Elementy animowane przez GSAP startują ukryte tylko tam, gdzie skrypty
+   działają — bez JS strona wygląda normalnie, a HTML nie wymaga znacznika
+   dokładanego przez skrypt (i nie powoduje rozjazdu przy hydracji). */
+@media (scripting: enabled) {
+  .anim-hide:not(.is-shown) {
+    opacity: 0;
+  }
+
+  /* Stan startowy zapisujemy właściwością `translate`, nie `transform` —
+     GSAP i tak zwija ją do swojego `y`, dlatego tweeny wierszy zerują `y`. */
+  .line-mask .line-inner {
+    translate: 0 105%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .anim-hide {
+    opacity: 1 !important;
+    transform: none !important;
+    translate: none !important;
+  }
+  .line-mask .line-inner {
+    transform: none !important;
+    translate: none !important;
+  }
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* Thin rule used as the section spine. */
+.spine {
+  border-top: 1px solid var(--rule);
+}
+.spine-dark {
+  border-top: 1px solid var(--rule-dark);
+}
