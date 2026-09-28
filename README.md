@@ -19,10 +19,10 @@ components/           sekcje strony i elementy współdzielone
 lib/content.ts        wszystkie treści i dane — jedno źródło prawdy
 lib/gsap.ts           rejestracja GSAP, obsługa prefers-reduced-motion
 media-source/         oryginały zdjęć i filmów od klienta (nieserwowane)
+  ASSETS.md           manifest: plik → co przedstawia → sekcja → status
 public/assets/bc-progres/
   img/                zoptymalizowane zdjęcia (maks. 1600 px)
   video/              hero: 1280p i 854p + plakat
-  ASSETS.md           manifest: plik → co przedstawia → sekcja → status
 ```
 
 ## Formularz kontaktowy
@@ -47,4 +47,4 @@ Na stronie nie ma wymyślonych danych: lat doświadczenia, liczby pracowników,
 opinii, liczby realizacji, telefonu, e-maila ani certyfikatów. Jedyna
 realizacja opisana z nazwy i daty to kontrakt MZWiK Nowy Targ, z linkiem do
 źródła. Przypisanie zdjęć do konkretnych inwestycji wymaga potwierdzenia
-przez klienta — patrz `public/assets/bc-progres/ASSETS.md`.
+przez klienta — patrz `media-source/ASSETS.md`.

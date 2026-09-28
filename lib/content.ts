@@ -3,7 +3,7 @@
  *
  * Zasada: nic, czego nie potwierdza rejestr, dokument publiczny albo zdjęcie
  * dostarczone przez klienta. Brak wymyślonych lokalizacji, dat, liczb i opinii.
- * Pełny wykaz zdjęć: public/assets/bc-progres/ASSETS.md
+ * Pełny wykaz zdjęć: media-source/ASSETS.md
  */
 
 const IMG = "/assets/bc-progres/img";
