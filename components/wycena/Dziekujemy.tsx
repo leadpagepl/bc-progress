@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { gsap, useGsap } from "@/lib/gsap";
 import { Logo } from "@/components/Logo";
@@ -15,6 +15,11 @@ export function Dziekujemy() {
       .fromTo(".dz-znak", { scale: 0.7, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.8 })
       .to(".dz-in", { opacity: 1, y: 0, duration: 0.9, stagger: 0.08 }, 0.25);
   });
+
+  /* Przycisk wysyłki zniknął z drzewa — fokus przechodzi na podziękowanie. */
+  useEffect(() => {
+    root.current?.querySelector("h1")?.focus({ preventScroll: true });
+  }, []);
 
   return (
     <div
@@ -47,7 +52,8 @@ export function Dziekujemy() {
         </div>
 
         <h1
-          className="dz-in mt-10 text-[clamp(1.75rem,5vw,3rem)] opacity-0"
+          tabIndex={-1}
+          className="dz-in mt-10 text-[clamp(1.75rem,5vw,3rem)] opacity-0 outline-none"
           style={{ transform: "translateY(12px)" }}
         >
           Dziękujemy za wiadomość.

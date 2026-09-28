@@ -27,10 +27,12 @@ public/assets/bc-progres/
 
 ## Formularz kontaktowy
 
-Endpoint: `app/api/kontakt/route.ts`.
+Endpoint: `app/api/wycena/route.ts` (walidacja i antyspam w `intake.ts`,
+wysyłka w `delivery.ts`, wspólne reguły z formularzem w `lib/lead.ts`).
 
-Bez konfiguracji zwraca **501 `not_configured`** i strona mówi wprost, że
-wiadomość nie została wysłana. Żeby go uruchomić, ustaw zmienne środowiskowe:
+Bez konfiguracji zwraca **503 `SERVICE_UNAVAILABLE`** i strona mówi wprost, że
+wiadomość nie została wysłana. Żeby go uruchomić, ustaw zmienne środowiskowe
+(wzór: `.env.example`):
 
 ```
 RESEND_API_KEY=re_...
@@ -40,6 +42,9 @@ CONTACT_FROM=strona@domena.pl
 
 Endpoint korzysta z REST API Resend przez `fetch` — nie wymaga dodatkowej
 zależności. Zamiana na inny dostawca to podmiana jednego wywołania `fetch`.
+
+Lokalnie `LEAD_DRY_RUN=1` pozwala przetestować wysyłkę bez Resend; w buildzie
+produkcyjnym ta zmienna jest ignorowana.
 
 ## Zasada treści
 
