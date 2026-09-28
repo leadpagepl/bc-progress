@@ -1,20 +1,20 @@
 import { NextResponse } from "next/server";
 import { looksLikeSpam, rateLimited, readForm, validateLead, verifyTurnstile } from "./intake";
-import { sendLeadEmail } from "./delivery";
+import { saveLeadToSheet } from "./delivery";
 
 export const runtime = "nodejs";
 
 /**
  * Odbiór zapytania o wycenę.
  *
- *   odczyt → antyspam → walidacja (LeadSubmission) → integracje
+ *   odczyt → antyspam → walidacja (LeadSubmission) → Google Apps Script
  *
  * Klient dostaje wyłącznie `{ ok: true }` albo `{ ok: false, code }`.
- * Bez RESEND_API_KEY, CONTACT_TO i CONTACT_FROM endpoint zwraca
- * SERVICE_UNAVAILABLE i nie udaje, że wiadomość poszła.
+ * Bez GOOGLE_LEADS_WEBHOOK_URL i GOOGLE_LEADS_WEBHOOK_SECRET endpoint zwraca
+ * SERVICE_UNAVAILABLE i nie udaje, że zgłoszenie zapisano.
  *
- * Załączniki nie są nigdzie zapisywane: lecą prosto w e-mailu, więc nie ma
- * katalogu z plikami, który mógłby wyciec.
+ * Załączniki trafiają wyłącznie do folderu zgłoszenia na Google Drive
+ * (tworzy go Apps Script); serwer strony niczego nie zapisuje.
  */
 
 type ErrorCode =
@@ -42,11 +42,12 @@ export async function POST(req: Request) {
   const lead = await validateLead(form);
   if (!lead) return odmowa("VALIDATION_ERROR", 400);
 
-  const email = await sendLeadEmail(lead);
-  /* TODO(faza 2): await saveLeadToSheet(lead) — adapter czeka w delivery.ts. */
+  /* Faza 2A: Google jest jedynym aktywnym kanałem — udany zapis wystarcza.
+     sendLeadEmail() (Resend) czeka w delivery.ts, niewłączony. */
+  const saved = await saveLeadToSheet(lead);
 
-  if (!email.ok) {
-    return email.reason === "not_configured"
+  if (!saved.ok) {
+    return saved.reason === "not_configured"
       ? odmowa("SERVICE_UNAVAILABLE", 503)
       : odmowa("DELIVERY_FAILED", 502);
   }

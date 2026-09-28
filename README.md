@@ -30,21 +30,21 @@ public/assets/bc-progres/
 Endpoint: `app/api/wycena/route.ts` (walidacja i antyspam w `intake.ts`,
 wysyłka w `delivery.ts`, wspólne reguły z formularzem w `lib/lead.ts`).
 
-Bez konfiguracji zwraca **503 `SERVICE_UNAVAILABLE`** i strona mówi wprost, że
-wiadomość nie została wysłana. Żeby go uruchomić, ustaw zmienne środowiskowe
-(wzór: `.env.example`):
+Zgłoszenie trafia do webhooka Google Apps Script: wiersz w Google Sheets,
+załączniki w folderze zgłoszenia na Google Drive. Bez konfiguracji endpoint
+zwraca **503 `SERVICE_UNAVAILABLE`** i strona mówi wprost, że wiadomość nie
+została wysłana. Zmienne środowiskowe (tylko serwer, wzór: `.env.example`):
 
 ```
-RESEND_API_KEY=re_...
-CONTACT_TO=biuro@domena.pl
-CONTACT_FROM=strona@domena.pl
+GOOGLE_LEADS_WEBHOOK_URL=https://script.google.com/macros/s/.../exec
+GOOGLE_LEADS_WEBHOOK_SECRET=...
 ```
 
-Endpoint korzysta z REST API Resend przez `fetch` — nie wymaga dodatkowej
-zależności. Zamiana na inny dostawca to podmiana jednego wywołania `fetch`.
+Integracja Resend (`sendLeadEmail` w `delivery.ts`) jest w kodzie, ale na tym
+etapie niewłączona — formularz nie wymaga zmiennych Resend.
 
-Lokalnie `LEAD_DRY_RUN=1` pozwala przetestować wysyłkę bez Resend; w buildzie
-produkcyjnym ta zmienna jest ignorowana.
+Lokalnie `LEAD_DRY_RUN=1` pozwala przetestować formularz bez wywołania
+integracji; w buildzie produkcyjnym ta zmienna jest ignorowana.
 
 ## Zasada treści
 
