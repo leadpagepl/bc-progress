@@ -252,12 +252,22 @@ export const projectTypes = [
 ] as const;
 
 /** Limity załączników. Te same wartości obowiązują w przeglądarce i na
- *  serwerze — przeglądarka daje wygodę, serwer decyduje. */
+ *  serwerze — przeglądarka daje wygodę, serwer decyduje.
+ *
+ *  Pliki lecą w jednym żądaniu, a Vercel przyjmuje body do 4.5 MB. Łącznie
+ *  3.5 MB zostawia zapas na pola formularza i narzut multipart. */
 export const uploadLimits = {
   maxFiles: 4,
-  maxFileBytes: 4 * 1024 * 1024,
-  maxTotalBytes: 8 * 1024 * 1024,
-  accept: ["image/jpeg", "image/png", "image/webp", "application/pdf"],
+  maxFileBytes: 3.5 * 1024 * 1024,
+  maxTotalBytes: 3.5 * 1024 * 1024,
+  /** Rozszerzenie → jedyny akceptowany typ pliku. */
+  types: {
+    jpg: "image/jpeg",
+    jpeg: "image/jpeg",
+    png: "image/png",
+    webp: "image/webp",
+    pdf: "application/pdf",
+  },
   acceptAttr: ".jpg,.jpeg,.png,.webp,.pdf,image/jpeg,image/png,image/webp,application/pdf",
 } as const;
 
