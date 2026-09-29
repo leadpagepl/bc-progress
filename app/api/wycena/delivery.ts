@@ -1,4 +1,5 @@
 import type { LeadSubmission } from "@/lib/lead";
+import { leadEmailHtml, leadEmailSubject, leadEmailText, leadReplyTo } from "./lead-email";
 
 /**
  * Integracje API wyceny. Każdy adapter dostaje gotowy, zwalidowany
@@ -13,7 +14,9 @@ export type DeliveryResult = { ok: true } | { ok: false; reason: "not_configured
 const dryRun = process.env.LEAD_DRY_RUN === "1" && process.env.NODE_ENV !== "production";
 
 /**
- * E-mail z zapytaniem przez REST API Resend.
+ * Powiadomienie e-mail o zapytaniu przez REST API Resend (szablon:
+ * lead-email.ts). Dodatek do zapisu w Google — nie jest miejscem
+ * przechowywania leadów. Odbiorca wyłącznie z CONTACT_TO.
  * Wymaga RESEND_API_KEY, CONTACT_TO i CONTACT_FROM — bez nich nic nie wysyła
  * i zwraca `not_configured`.
  */
@@ -26,7 +29,10 @@ export async function sendLeadEmail(lead: LeadSubmission): Promise<DeliveryResul
   const key = process.env.RESEND_API_KEY;
   const to = process.env.CONTACT_TO;
   const from = process.env.CONTACT_FROM;
-  if (!key || !to || !from) return { ok: false, reason: "not_configured" };
+  if (!key || !to || !from) {
+    console.error("[wycena] Resend nieskonfigurowany — powiadomienie pominięte");
+    return { ok: false, reason: "not_configured" };
+  }
 
   try {
     const res = await fetch("https://api.resend.com/emails", {
@@ -38,11 +44,12 @@ export async function sendLeadEmail(lead: LeadSubmission): Promise<DeliveryResul
       body: JSON.stringify({
         from,
         to: [to],
-        /* Imię przeszło normalizację jednowierszową, a e-mail walidację, więc
-           żadne z nich nie wniesie CR/LF do nagłówków Subject i Reply-To. */
-        reply_to: lead.email ?? undefined,
-        subject: `Zapytanie o wycenę od ${lead.name}`,
-        text: emailText(lead),
+        /* Imię przeszło normalizację jednowierszową, a e-mail walidację;
+           lead-email.ts dodatkowo odcina CR/LF od Subject i Reply-To. */
+        reply_to: leadReplyTo(lead),
+        subject: leadEmailSubject(lead),
+        html: leadEmailHtml(lead),
+        text: leadEmailText(lead),
         attachments: lead.attachments.length
           ? lead.attachments.map((a) => ({
               filename: a.filename,
@@ -54,13 +61,18 @@ export async function sendLeadEmail(lead: LeadSubmission): Promise<DeliveryResul
     });
 
     if (!res.ok) {
-      /* Odpowiedź Resend zostaje na serwerze; w logu tylko status. */
-      console.error(`[wycena] Resend odrzucił wiadomość: HTTP ${res.status}`);
+      /* Odpowiedź Resend zostaje na serwerze; w logu tylko status i nazwa
+         błędu (np. validation_error) — bez treści, adresów i danych leada. */
+      const data: unknown = await res.json().catch(() => null);
+      const name = (data as { name?: unknown } | null)?.name;
+      const safeName = typeof name === "string" && /^[a-z_]{1,40}$/.test(name) ? ` (${name})` : "";
+      console.error(`[wycena] Resend odrzucił wiadomość: HTTP ${res.status}${safeName}`);
       return { ok: false, reason: "failed" };
     }
     return { ok: true };
-  } catch {
-    console.error("[wycena] Brak odpowiedzi z Resend");
+  } catch (e) {
+    const timeout = e instanceof Error && e.name === "TimeoutError";
+    console.error(`[wycena] ${timeout ? "Przekroczony czas odpowiedzi" : "Brak połączenia z"} Resend`);
     return { ok: false, reason: "failed" };
   }
 }
@@ -126,23 +138,4 @@ export async function saveLeadToSheet(lead: LeadSubmission): Promise<DeliveryRes
     console.error(`[wycena] ${timeout ? "Przekroczony czas odpowiedzi" : "Brak połączenia z"} Apps Script`);
     return { ok: false, reason: "failed" };
   }
-}
-
-function emailText(lead: LeadSubmission) {
-  return [
-    `Rodzaj inwestycji: ${lead.projectType}`,
-    `Lokalizacja: ${lead.location}`,
-    lead.reference ? `Dotyczy realizacji: ${lead.reference}` : null,
-    "",
-    "Opis:",
-    lead.description || "nie podano",
-    "",
-    `Imię: ${lead.name}`,
-    `Telefon: ${lead.phone}`,
-    `E-mail: ${lead.email ?? "nie podano"}`,
-    "",
-    `Załączniki: ${lead.attachments.length}`,
-  ]
-    .filter((l) => l !== null)
-    .join("\n");
 }

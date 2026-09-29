@@ -40,8 +40,10 @@ GOOGLE_LEADS_WEBHOOK_URL=https://script.google.com/macros/s/.../exec
 GOOGLE_LEADS_WEBHOOK_SECRET=...
 ```
 
-Integracja Resend (`sendLeadEmail` w `delivery.ts`) jest w kodzie, ale na tym
-etapie niewłączona — formularz nie wymaga zmiennych Resend.
+Po udanym zapisie w Google wychodzi dodatkowe powiadomienie e-mail przez
+Resend (`sendLeadEmail` w `delivery.ts`, szablon w `lead-email.ts`) na adres
+z `CONTACT_TO`. To tylko powiadomienie: brak zmiennych `RESEND_API_KEY`,
+`CONTACT_TO`, `CONTACT_FROM` albo błąd Resend nie zmienia wyniku formularza.
 
 Lokalnie `LEAD_DRY_RUN=1` pozwala przetestować formularz bez wywołania
 integracji; w buildzie produkcyjnym ta zmienna jest ignorowana.

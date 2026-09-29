@@ -1,6 +1,6 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { looksLikeSpam, rateLimited, readForm, validateLead, verifyTurnstile } from "./intake";
-import { saveLeadToSheet } from "./delivery";
+import { saveLeadToSheet, sendLeadEmail } from "./delivery";
 
 export const runtime = "nodejs";
 
@@ -8,6 +8,7 @@ export const runtime = "nodejs";
  * Odbiór zapytania o wycenę.
  *
  *   odczyt → antyspam → walidacja (LeadSubmission) → Google Apps Script
+ *   → (po odpowiedzi) powiadomienie Resend
  *
  * Klient dostaje wyłącznie `{ ok: true }` albo `{ ok: false, code }`.
  * Bez GOOGLE_LEADS_WEBHOOK_URL i GOOGLE_LEADS_WEBHOOK_SECRET endpoint zwraca
@@ -42,8 +43,7 @@ export async function POST(req: Request) {
   const lead = await validateLead(form);
   if (!lead) return odmowa("VALIDATION_ERROR", 400);
 
-  /* Faza 2A: Google jest jedynym aktywnym kanałem — udany zapis wystarcza.
-     sendLeadEmail() (Resend) czeka w delivery.ts, niewłączony. */
+  /* Google to główny zapis — o sukcesie formularza decyduje wyłącznie on. */
   const saved = await saveLeadToSheet(lead);
 
   if (!saved.ok) {
@@ -51,5 +51,11 @@ export async function POST(req: Request) {
       ? odmowa("SERVICE_UNAVAILABLE", 503)
       : odmowa("DELIVERY_FAILED", 502);
   }
+
+  /* Lead jest już w Sheets/Drive. E-mail to tylko powiadomienie: rusza po
+     wysłaniu odpowiedzi, więc jego błąd ani timeout nie zmienią wyniku
+     formularza. Porażkę loguje sendLeadEmail(). */
+  after(() => sendLeadEmail(lead));
+
   return NextResponse.json({ ok: true });
 }
