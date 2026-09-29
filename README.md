@@ -19,27 +19,34 @@ components/           sekcje strony i elementy współdzielone
 lib/content.ts        wszystkie treści i dane — jedno źródło prawdy
 lib/gsap.ts           rejestracja GSAP, obsługa prefers-reduced-motion
 media-source/         oryginały zdjęć i filmów od klienta (nieserwowane)
+  ASSETS.md           manifest: plik → co przedstawia → sekcja → status
 public/assets/bc-progres/
   img/                zoptymalizowane zdjęcia (maks. 1600 px)
   video/              hero: 1280p i 854p + plakat
-  ASSETS.md           manifest: plik → co przedstawia → sekcja → status
 ```
 
 ## Formularz kontaktowy
 
-Endpoint: `app/api/kontakt/route.ts`.
+Endpoint: `app/api/wycena/route.ts` (walidacja i antyspam w `intake.ts`,
+wysyłka w `delivery.ts`, wspólne reguły z formularzem w `lib/lead.ts`).
 
-Bez konfiguracji zwraca **501 `not_configured`** i strona mówi wprost, że
-wiadomość nie została wysłana. Żeby go uruchomić, ustaw zmienne środowiskowe:
+Zgłoszenie trafia do webhooka Google Apps Script: wiersz w Google Sheets,
+załączniki w folderze zgłoszenia na Google Drive. Bez konfiguracji endpoint
+zwraca **503 `SERVICE_UNAVAILABLE`** i strona mówi wprost, że wiadomość nie
+została wysłana. Zmienne środowiskowe (tylko serwer, wzór: `.env.example`):
 
 ```
-RESEND_API_KEY=re_...
-CONTACT_TO=biuro@domena.pl
-CONTACT_FROM=strona@domena.pl
+GOOGLE_LEADS_WEBHOOK_URL=https://script.google.com/macros/s/.../exec
+GOOGLE_LEADS_WEBHOOK_SECRET=...
 ```
 
-Endpoint korzysta z REST API Resend przez `fetch` — nie wymaga dodatkowej
-zależności. Zamiana na inny dostawca to podmiana jednego wywołania `fetch`.
+Po udanym zapisie w Google wychodzi dodatkowe powiadomienie e-mail przez
+Resend (`sendLeadEmail` w `delivery.ts`, szablon w `lead-email.ts`) na adres
+z `CONTACT_TO`. To tylko powiadomienie: brak zmiennych `RESEND_API_KEY`,
+`CONTACT_TO`, `CONTACT_FROM` albo błąd Resend nie zmienia wyniku formularza.
+
+Lokalnie `LEAD_DRY_RUN=1` pozwala przetestować formularz bez wywołania
+integracji; w buildzie produkcyjnym ta zmienna jest ignorowana.
 
 ## Zasada treści
 
@@ -47,4 +54,4 @@ Na stronie nie ma wymyślonych danych: lat doświadczenia, liczby pracowników,
 opinii, liczby realizacji, telefonu, e-maila ani certyfikatów. Jedyna
 realizacja opisana z nazwy i daty to kontrakt MZWiK Nowy Targ, z linkiem do
 źródła. Przypisanie zdjęć do konkretnych inwestycji wymaga potwierdzenia
-przez klienta — patrz `public/assets/bc-progres/ASSETS.md`.
+przez klienta — patrz `media-source/ASSETS.md`.

@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { projectTypes, uploadLimits } from "@/lib/content";
+import { isAcceptedFile, leadLimits } from "@/lib/lead";
 import type { Dane } from "./WycenaForm";
 import { Naglowek, Pole, Przycisk, Strzalka } from "./Pola";
 
@@ -22,7 +23,7 @@ export function KrokInwestycja({
   const [nadPolem, setNadPolem] = useState(false);
   const [blodPliku, setBlodPliku] = useState("");
 
-  /** Ta sama kontrola co na serwerze: liczba, rozmiar, typ. */
+  /** Ta sama kontrola co na serwerze: liczba, rozmiar, rozszerzenie i typ. */
   function dodaj(nowe: FileList | null) {
     if (!nowe?.length) return;
     setBlodPliku("");
@@ -33,7 +34,7 @@ export function KrokInwestycja({
         setBlodPliku(`Maksymalnie ${uploadLimits.maxFiles} pliki.`);
         break;
       }
-      if (!(uploadLimits.accept as readonly string[]).includes(f.type)) {
+      if (!isAcceptedFile(f)) {
         setBlodPliku("Przyjmujemy pliki JPG, PNG, WebP i PDF.");
         continue;
       }
@@ -62,7 +63,7 @@ export function KrokInwestycja({
       />
 
       {/* Rodzaj inwestycji */}
-      <fieldset>
+      <fieldset aria-describedby={bledy.typ ? "typ-error" : undefined}>
         <legend className="eyebrow text-grey">
           Rodzaj inwestycji<span className="ml-1 text-yellow">*</span>
         </legend>
@@ -108,7 +109,7 @@ export function KrokInwestycja({
           })}
         </div>
         {bledy.typ ? (
-          <p className="mt-3 text-sm text-graphite">
+          <p id="typ-error" className="mt-3 text-sm text-graphite">
             <span className="mr-2 inline-block h-2 w-2 bg-yellow align-middle" />
             {bledy.typ}
           </p>
@@ -120,6 +121,7 @@ export function KrokInwestycja({
         label="Gdzie planujesz budowę?"
         placeholder="Miejscowość"
         required
+        maxLength={leadLimits.location.max}
         autoComplete="address-level2"
         enterKeyHint="next"
         value={dane.lokalizacja}
@@ -134,6 +136,7 @@ export function KrokInwestycja({
         textarea
         value={dane.opis}
         onChange={(v) => ustaw({ opis: v })}
+        error={bledy.opis}
       />
 
       {/* Załączniki */}
@@ -178,16 +181,19 @@ export function KrokInwestycja({
             {/* Na desktopie działa też przeciągnięcie. */}
             <span className="hidden sm:inline">Możesz też przeciągnąć je tutaj. </span>
             JPG, PNG, WebP lub PDF. Do {uploadLimits.maxFiles} plików,{" "}
-            {MB(uploadLimits.maxFileBytes)} każdy.
+            łącznie {MB(uploadLimits.maxTotalBytes)}.
           </p>
         </div>
 
-        {blodPliku ? (
-          <p className="mt-3 text-sm text-graphite">
-            <span className="mr-2 inline-block h-2 w-2 bg-yellow align-middle" />
-            {blodPliku}
-          </p>
-        ) : null}
+        {/* Stały region, żeby czytnik ekranu ogłosił komunikat o pliku. */}
+        <div aria-live="polite">
+          {blodPliku ? (
+            <p className="mt-3 text-sm text-graphite">
+              <span className="mr-2 inline-block h-2 w-2 bg-yellow align-middle" />
+              {blodPliku}
+            </p>
+          ) : null}
+        </div>
 
         {dane.pliki.length > 0 ? (
           <ul className="mt-4 flex flex-col gap-2">

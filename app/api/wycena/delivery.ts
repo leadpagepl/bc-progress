@@ -1,0 +1,141 @@
+import type { LeadSubmission } from "@/lib/lead";
+import { leadEmailHtml, leadEmailSubject, leadEmailText, leadReplyTo } from "./lead-email";
+
+/**
+ * Integracje API wyceny. Każdy adapter dostaje gotowy, zwalidowany
+ * LeadSubmission i nic nie wie o żądaniu HTTP.
+ */
+
+export type DeliveryResult = { ok: true } | { ok: false; reason: "not_configured" | "failed" };
+
+/* Lokalny tryb testowy: LEAD_DRY_RUN=1 udaje udaną wysyłkę bez wywołania
+   integracji. W buildzie produkcyjnym jest ignorowany, żeby na Vercel nie
+   połknąć prawdziwego zapytania. */
+const dryRun = process.env.LEAD_DRY_RUN === "1" && process.env.NODE_ENV !== "production";
+
+/**
+ * Powiadomienie e-mail o zapytaniu przez REST API Resend (szablon:
+ * lead-email.ts). Dodatek do zapisu w Google — nie jest miejscem
+ * przechowywania leadów. Odbiorca wyłącznie z CONTACT_TO.
+ * Wymaga RESEND_API_KEY, CONTACT_TO i CONTACT_FROM — bez nich nic nie wysyła
+ * i zwraca `not_configured`.
+ */
+export async function sendLeadEmail(lead: LeadSubmission): Promise<DeliveryResult> {
+  if (dryRun) {
+    console.info(`[wycena] LEAD_DRY_RUN: e-mail pominięty, załączniki: ${lead.attachments.length}`);
+    return { ok: true };
+  }
+
+  const key = process.env.RESEND_API_KEY;
+  const to = process.env.CONTACT_TO;
+  const from = process.env.CONTACT_FROM;
+  if (!key || !to || !from) {
+    console.error("[wycena] Resend nieskonfigurowany — powiadomienie pominięte");
+    return { ok: false, reason: "not_configured" };
+  }
+
+  try {
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${key}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from,
+        to: [to],
+        /* Imię przeszło normalizację jednowierszową, a e-mail walidację;
+           lead-email.ts dodatkowo odcina CR/LF od Subject i Reply-To. */
+        reply_to: leadReplyTo(lead),
+        subject: leadEmailSubject(lead),
+        html: leadEmailHtml(lead),
+        text: leadEmailText(lead),
+        attachments: lead.attachments.length
+          ? lead.attachments.map((a) => ({
+              filename: a.filename,
+              content: Buffer.from(a.data).toString("base64"),
+            }))
+          : undefined,
+      }),
+      signal: AbortSignal.timeout(15_000),
+    });
+
+    if (!res.ok) {
+      /* Odpowiedź Resend zostaje na serwerze; w logu tylko status i nazwa
+         błędu (np. validation_error) — bez treści, adresów i danych leada. */
+      const data: unknown = await res.json().catch(() => null);
+      const name = (data as { name?: unknown } | null)?.name;
+      const safeName = typeof name === "string" && /^[a-z_]{1,40}$/.test(name) ? ` (${name})` : "";
+      console.error(`[wycena] Resend odrzucił wiadomość: HTTP ${res.status}${safeName}`);
+      return { ok: false, reason: "failed" };
+    }
+    return { ok: true };
+  } catch (e) {
+    const timeout = e instanceof Error && e.name === "TimeoutError";
+    console.error(`[wycena] ${timeout ? "Przekroczony czas odpowiedzi" : "Brak połączenia z"} Resend`);
+    return { ok: false, reason: "failed" };
+  }
+}
+
+const WEBHOOK_TIMEOUT_MS = 15_000;
+
+/**
+ * Zapis leada przez webhook Google Apps Script: wiersz w Sheets, folder
+ * z załącznikami na Drive, linki w arkuszu, Status = „Nowy”.
+ *
+ * Wymaga GOOGLE_LEADS_WEBHOOK_URL i GOOGLE_LEADS_WEBHOOK_SECRET (tylko po
+ * stronie serwera). Sukces to wyłącznie HTTP OK z JSON `{ ok: true }` —
+ * samo 200 nie wystarcza, bo Apps Script zwraca 200 także przy błędzie.
+ */
+export async function saveLeadToSheet(lead: LeadSubmission): Promise<DeliveryResult> {
+  if (dryRun) {
+    console.info(`[wycena] LEAD_DRY_RUN: zapis w Google pominięty, załączniki: ${lead.attachments.length}`);
+    return { ok: true };
+  }
+
+  const url = process.env.GOOGLE_LEADS_WEBHOOK_URL;
+  const secret = process.env.GOOGLE_LEADS_WEBHOOK_SECRET;
+  if (!url || !secret) return { ok: false, reason: "not_configured" };
+
+  try {
+    /* Apps Script odpowiada przekierowaniem na googleusercontent.com z wynikiem
+       doPost — fetch podąża za nim sam. */
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        secret,
+        name: lead.name,
+        phone: lead.phone,
+        email: lead.email ?? "",
+        projectType: lead.projectType,
+        location: lead.location,
+        description: lead.description,
+        realization: lead.reference ?? "",
+        attachments: lead.attachments.map((a) => ({
+          name: a.filename,
+          mimeType: a.contentType,
+          base64: Buffer.from(a.data).toString("base64"),
+        })),
+      }),
+      redirect: "follow",
+      cache: "no-store",
+      signal: AbortSignal.timeout(WEBHOOK_TIMEOUT_MS),
+    });
+
+    const data: unknown = await res.json().catch(() => null);
+    const ok = typeof data === "object" && data !== null && (data as { ok?: unknown }).ok === true;
+    if (!res.ok || !ok) {
+      /* Treść odpowiedzi zostaje na serwerze; w logu tylko status i krótki kod. */
+      const code = (data as { code?: unknown } | null)?.code;
+      const safeCode = typeof code === "string" && /^[\w-]{1,40}$/.test(code) ? ` (${code})` : "";
+      console.error(`[wycena] Apps Script nie zapisał zgłoszenia: HTTP ${res.status}${safeCode}`);
+      return { ok: false, reason: "failed" };
+    }
+    return { ok: true };
+  } catch (e) {
+    const timeout = e instanceof Error && e.name === "TimeoutError";
+    console.error(`[wycena] ${timeout ? "Przekroczony czas odpowiedzi" : "Brak połączenia z"} Apps Script`);
+    return { ok: false, reason: "failed" };
+  }
+}

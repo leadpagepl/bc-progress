@@ -2,7 +2,16 @@
 
 import { useEffect, useRef, useState } from "react";
 import { gsap, reducedMotion } from "@/lib/gsap";
-import { projectTypes } from "@/lib/content";
+import {
+  isValidDescription,
+  isValidEmail,
+  isValidLocation,
+  isValidName,
+  isValidPhone,
+  leadLimits,
+  normalizeText,
+  projectTypeLabel,
+} from "@/lib/lead";
 import { KrokInwestycja } from "./KrokInwestycja";
 import { KrokKontakt } from "./KrokKontakt";
 import { Postep } from "./Postep";
@@ -30,7 +39,8 @@ const PUSTE: Dane = {
   zgoda: false,
 };
 
-type Stan = "form" | "sending" | "sent" | "not_configured" | "error";
+/** `invalid` i `unavailable` to odmiany błędu z własnym komunikatem. */
+export type Stan = "idle" | "submitting" | "success" | "error" | "invalid" | "unavailable";
 
 /**
  * Formularz zapytania o wycenę. Żyje wewnątrz modala, więc nie ma tu żadnej
@@ -39,11 +49,14 @@ type Stan = "form" | "sending" | "sent" | "not_configured" | "error";
 export function WycenaForm({ realizacja }: { realizacja?: string }) {
   const [krok, setKrok] = useState<1 | 2>(1);
   const [dane, setDane] = useState<Dane>(PUSTE);
-  const [stan, setStan] = useState<Stan>("form");
+  const [stan, setStan] = useState<Stan>("idle");
   const [bledy, setBledy] = useState<Record<string, string>>({});
   const startedAt = useRef(Date.now());
   const krokRef = useRef<HTMLDivElement>(null);
   const pierwszy = useRef(true);
+  /* Blokada niezależna od renderu: drugi klik albo Enter w trakcie wysyłki
+     nie tworzy drugiego żądania, zanim przycisk zdąży się wyłączyć. */
+  const wysylka = useRef(false);
 
   const ustaw = (patch: Partial<Dane>) => setDane((d) => ({ ...d, ...patch }));
 
@@ -54,7 +67,10 @@ export function WycenaForm({ realizacja }: { realizacja?: string }) {
       return;
     }
     const el = krokRef.current;
-    if (!el || reducedMotion()) return;
+    if (!el) return;
+    /* Przycisk Dalej / Wstecz zniknął z drzewa — fokus zostaje w modalu. */
+    el.focus({ preventScroll: true });
+    if (reducedMotion()) return;
     gsap.fromTo(
       el,
       { opacity: 0, x: krok === 2 ? 20 : -20 },
@@ -62,33 +78,53 @@ export function WycenaForm({ realizacja }: { realizacja?: string }) {
     );
   }, [krok]);
 
+  /** Fokus na pierwszym polu z błędem, w kolejności wyświetlania. */
+  function fokusNaBlad(b: Record<string, string>, kolejnosc: string[]) {
+    const klucz = kolejnosc.find((k) => b[k]);
+    if (!klucz) return;
+    krokRef.current
+      ?.querySelector<HTMLElement>(klucz === "typ" ? "fieldset button" : `[name="${klucz}"]`)
+      ?.focus();
+  }
+
   function dalej() {
     const b: Record<string, string> = {};
-    if (!dane.typ) b.typ = "Wybierz rodzaj inwestycji.";
-    if (dane.lokalizacja.trim().length < 2) b.lokalizacja = "Podaj miejscowość.";
+    if (!projectTypeLabel(dane.typ)) b.typ = "Wybierz rodzaj inwestycji.";
+    if (!isValidLocation(normalizeText(dane.lokalizacja))) b.lokalizacja = "Podaj miejscowość.";
+    if (!isValidDescription(normalizeText(dane.opis, { multiline: true }))) {
+      b.opis = `Opis może mieć najwyżej ${leadLimits.description.max} znaków.`;
+    }
     setBledy(b);
-    if (Object.keys(b).length) return;
+    if (Object.keys(b).length) {
+      fokusNaBlad(b, ["typ", "lokalizacja", "opis"]);
+      return;
+    }
     setKrok(2);
     krokRef.current?.closest("[data-wy-scroll]")?.scrollTo({ top: 0 });
   }
 
   async function wyslij(e: React.FormEvent) {
     e.preventDefault();
+    if (wysylka.current) return;
+
     const b: Record<string, string> = {};
-    if (dane.imie.trim().length < 2) b.imie = "Podaj imię.";
-    if ((dane.telefon.match(/\d/g) ?? []).length < 9) {
+    if (!isValidName(normalizeText(dane.imie))) b.imie = "Podaj imię.";
+    if (!isValidPhone(normalizeText(dane.telefon))) {
       b.telefon = "Podaj numer telefonu (min. 9 cyfr).";
     }
-    if (dane.email && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(dane.email)) {
-      b.email = "Sprawdź adres e-mail.";
-    }
+    const email = normalizeText(dane.email);
+    if (email && !isValidEmail(email)) b.email = "Sprawdź adres e-mail.";
     if (!dane.zgoda) b.zgoda = "Potrzebujemy tej zgody, żeby odpowiedzieć.";
     setBledy(b);
-    if (Object.keys(b).length) return;
+    if (Object.keys(b).length) {
+      fokusNaBlad(b, ["imie", "telefon", "email", "zgoda"]);
+      return;
+    }
 
-    setStan("sending");
+    wysylka.current = true;
+    setStan("submitting");
     const fd = new FormData();
-    fd.set("typ", projectTypes.find((t) => t.id === dane.typ)?.label ?? dane.typ);
+    fd.set("typ", dane.typ);
     fd.set("lokalizacja", dane.lokalizacja);
     fd.set("opis", dane.opis);
     fd.set("imie", dane.imie);
@@ -102,16 +138,19 @@ export function WycenaForm({ realizacja }: { realizacja?: string }) {
 
     try {
       const res = await fetch("/api/wycena", { method: "POST", body: fd });
-      const data = await res.json().catch(() => ({}));
-      if (res.ok) setStan("sent");
-      else if (data?.code === "not_configured") setStan("not_configured");
+      const data = await res.json().catch(() => null);
+      if (res.ok && data?.ok) setStan("success");
+      else if (data?.code === "SERVICE_UNAVAILABLE") setStan("unavailable");
+      else if (data?.code === "VALIDATION_ERROR") setStan("invalid");
       else setStan("error");
     } catch {
       setStan("error");
+    } finally {
+      wysylka.current = false;
     }
   }
 
-  if (stan === "sent") return <Dziekujemy />;
+  if (stan === "success") return <Dziekujemy />;
 
   return (
     <div>
@@ -123,7 +162,7 @@ export function WycenaForm({ realizacja }: { realizacja?: string }) {
         </p>
       ) : null}
 
-      <div ref={krokRef} className="mt-8">
+      <div ref={krokRef} tabIndex={-1} className="mt-8 outline-none">
         {krok === 1 ? (
           <KrokInwestycja dane={dane} bledy={bledy} ustaw={ustaw} onDalej={dalej} />
         ) : (

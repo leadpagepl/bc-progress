@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { company } from "@/lib/content";
-import type { Dane } from "./WycenaForm";
+import { leadLimits } from "@/lib/lead";
+import type { Dane, Stan } from "./WycenaForm";
 import { Naglowek, Pole, Przycisk, Strzalka } from "./Pola";
 
 export function KrokKontakt({
@@ -15,13 +16,20 @@ export function KrokKontakt({
 }: {
   dane: Dane;
   bledy: Record<string, string>;
-  stan: "form" | "sending" | "sent" | "not_configured" | "error";
+  stan: Stan;
   ustaw: (p: Partial<Dane>) => void;
   onWstecz: () => void;
   onSubmit: (e: React.FormEvent) => void;
 }) {
+  const wysylanie = stan === "submitting";
+
   return (
-    <form onSubmit={onSubmit} noValidate className="flex flex-col gap-10">
+    <form
+      onSubmit={onSubmit}
+      noValidate
+      aria-busy={wysylanie}
+      className="flex flex-col gap-10"
+    >
       <Naglowek tytul="Jak możemy się z Tobą skontaktować?" />
 
       <div className="flex flex-col gap-7">
@@ -29,6 +37,7 @@ export function KrokKontakt({
           name="imie"
           label="Imię"
           required
+          maxLength={leadLimits.name.max}
           autoComplete="given-name"
           autoCapitalize="words"
           enterKeyHint="next"
@@ -42,6 +51,7 @@ export function KrokKontakt({
           required
           type="tel"
           inputMode="tel"
+          maxLength={leadLimits.phone.max}
           autoComplete="tel"
           enterKeyHint="next"
           value={dane.telefon}
@@ -53,6 +63,7 @@ export function KrokKontakt({
           label="E-mail"
           type="email"
           inputMode="email"
+          maxLength={leadLimits.email.max}
           autoComplete="email"
           autoCapitalize="off"
           enterKeyHint="done"
@@ -70,6 +81,8 @@ export function KrokKontakt({
               name="zgoda"
               checked={dane.zgoda}
               onChange={(e) => ustaw({ zgoda: e.target.checked })}
+              aria-invalid={bledy.zgoda ? true : undefined}
+              aria-describedby={bledy.zgoda ? "zgoda-error" : undefined}
               className="peer absolute inset-0 h-full w-full cursor-pointer appearance-none border border-graphite/35 bg-white transition-colors checked:border-yellow checked:bg-yellow"
             />
             <svg
@@ -92,7 +105,7 @@ export function KrokKontakt({
           </span>
         </label>
         {bledy.zgoda ? (
-          <p className="mt-3 pl-10 text-sm text-graphite">
+          <p id="zgoda-error" className="mt-3 pl-10 text-sm text-graphite">
             <span className="mr-2 inline-block h-2 w-2 bg-yellow align-middle" />
             {bledy.zgoda}
           </p>
@@ -102,14 +115,14 @@ export function KrokKontakt({
       <div className="flex flex-col gap-3 sm:flex-row-reverse sm:justify-end">
         <button
           type="submit"
-          disabled={stan === "sending"}
+          disabled={wysylanie}
           className="group inline-flex w-full items-center justify-between gap-6 bg-graphite px-7 py-5 text-[12px] font-bold tracking-[0.16em] text-bone uppercase transition-colors duration-300 hover:bg-yellow hover:text-graphite disabled:opacity-60 sm:w-auto"
         >
-          {stan === "sending" ? "Wysyłanie…" : "Wyślij zapytanie"}
+          {wysylanie ? "Wysyłanie…" : "Wyślij zapytanie"}
           <Strzalka />
         </button>
 
-        <Przycisk wariant="poboczny" onClick={onWstecz} disabled={stan === "sending"}>
+        <Przycisk wariant="poboczny" onClick={onWstecz} disabled={wysylanie}>
           <Strzalka wstecz />
           Wstecz
         </Przycisk>
@@ -117,7 +130,7 @@ export function KrokKontakt({
 
       {/* Komunikaty mówią prawdę o tym, co się wydarzyło. */}
       <p aria-live="polite" className="max-w-[52ch] text-sm leading-relaxed">
-        {stan === "not_configured" && (
+        {stan === "unavailable" && (
           <span className="text-graphite">
             <strong>Zapytanie nie zostało wysłane.</strong> Skrzynka firmy nie
             jest jeszcze podłączona do formularza. Twoje dane zostały w
@@ -146,6 +159,12 @@ export function KrokKontakt({
           <span className="text-graphite">
             <strong>Nie udało się wysłać zapytania.</strong> Dane zostały w
             formularzu, możesz spróbować jeszcze raz.
+          </span>
+        )}
+        {stan === "invalid" && (
+          <span className="text-graphite">
+            <strong>Nie udało się wysłać zapytania.</strong> Serwer nie przyjął
+            danych albo załącznika. Sprawdź pola i pliki, potem spróbuj ponownie.
           </span>
         )}
       </p>
