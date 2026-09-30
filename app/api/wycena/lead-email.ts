@@ -68,8 +68,13 @@ export function leadReplyTo(lead: LeadSubmission) {
   return lead.email && !/[\r\n]/.test(lead.email) ? lead.email : undefined;
 }
 
-export function leadEmailText(lead: LeadSubmission) {
+/* Link do folderu tylko przy załącznikach — bez plików nie ma folderu. */
+const folderFor = (lead: LeadSubmission, folderUrl: string | null) =>
+  lead.attachments.length ? folderUrl : null;
+
+export function leadEmailText(lead: LeadSubmission, folderUrl: string | null = null) {
   const n = lead.attachments.length;
+  const folder = folderFor(lead, folderUrl);
   return [
     `NOWE ZAPYTANIE ZE STRONY — ${company.shortName}`,
     submittedLabel(lead.submittedAt),
@@ -82,6 +87,7 @@ export function leadEmailText(lead: LeadSubmission) {
     lead.reference ? `Dotyczy realizacji: ${lead.reference}` : null,
     lead.description ? `\nOpis:\n${lead.description}` : null,
     n ? `\nZałączniki: ${attachmentsSummary(n)}` : null,
+    folder ? `\nFolder Google Drive:\n${folder}` : null,
     "",
     "—",
     company.name,
@@ -91,9 +97,10 @@ export function leadEmailText(lead: LeadSubmission) {
     .join("\n");
 }
 
-export function leadEmailHtml(lead: LeadSubmission) {
+export function leadEmailHtml(lead: LeadSubmission, folderUrl: string | null = null) {
   const e = escapeHtml;
   const n = lead.attachments.length;
+  const folder = folderFor(lead, folderUrl);
 
   const label = (text: string) =>
     `<p style="margin:0 0 6px;font-family:${FONT};font-size:11px;line-height:16px;font-weight:bold;letter-spacing:1.5px;text-transform:uppercase;color:${C.grey};">${text}</p>`;
@@ -135,7 +142,10 @@ export function leadEmailHtml(lead: LeadSubmission) {
           value(e(attachmentsSummary(n))) +
             `<p style="margin:8px 0 0;font-family:${FONT};font-size:13px;line-height:20px;color:${C.grey};">${lead.attachments
               .map((a) => e(a.filename))
-              .join("<br>")}</p>`,
+              .join("<br>")}</p>` +
+            (folder
+              ? `<p style="margin:16px 0 0;font-family:${FONT};font-size:15px;line-height:22px;"><a href="${e(folder)}" style="color:${C.graphite};font-weight:bold;text-decoration:none;border-bottom:2px solid ${C.yellow};">Otwórz folder załączników w Google Drive &rarr;</a></p>`
+              : ""),
         )
       : "",
   ].join("");

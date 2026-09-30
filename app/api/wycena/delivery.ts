@@ -6,7 +6,43 @@ import { leadEmailHtml, leadEmailSubject, leadEmailText, leadReplyTo } from "./l
  * LeadSubmission i nic nie wie o żądaniu HTTP.
  */
 
-export type DeliveryResult = { ok: true } | { ok: false; reason: "not_configured" | "failed" };
+type DeliveryFailure = { ok: false; reason: "not_configured" | "failed" };
+export type DeliveryResult = { ok: true } | DeliveryFailure;
+/** Wynik zapisu w Google: przy sukcesie zwalidowany link do folderu z załącznikami. */
+export type SheetResult = { ok: true; folderUrl: string | null } | DeliveryFailure;
+
+/* ID folderu Drive: litery, cyfry, „-” i „_”. */
+const DRIVE_FOLDER_PATH = /^\/drive\/(?:u\/\d+\/)?folders\/([A-Za-z0-9_-]{10,200})\/?$/;
+
+/* Surowa wartość musi już być czystym linkiem do folderu: dokładnie
+   „https://drive.google.com/drive/…folders/<ID>”, samo ASCII, bez portu,
+   loginu, spacji i znaków sterujących. Parser URL po cichu usuwa CR/LF
+   i tabulatory, gubi domyślny port :443, mapuje znaki pełnej szerokości
+   i rozwija „..” — takie wejścia odrzucamy, zamiast je normalizować.
+   Query i fragment są dopuszczalne, ale nie trafiają do wyniku. */
+const RAW_DRIVE_FOLDER_URL =
+  /^https:\/\/drive\.google\.com\/drive\/(?:u\/\d+\/)?folders\/[A-Za-z0-9_-]{10,200}\/?(?:[?#][A-Za-z0-9._~!$&'()*+,;=:@\/?#%-]*)?$/;
+
+/**
+ * Link do folderu z odpowiedzi webhooka — tylko https://drive.google.com
+ * z adresem folderu. Link jest składany od nowa z samego ID, więc query,
+ * fragment i dane logowania z odpowiedzi nie trafiają do maila.
+ */
+export function driveFolderUrl(value: unknown): string | null {
+  if (typeof value !== "string" || value.length > 500 || !RAW_DRIVE_FOLDER_URL.test(value)) {
+    return null;
+  }
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return null;
+  }
+  if (url.protocol !== "https:" || url.hostname !== "drive.google.com") return null;
+  if (url.username || url.password || url.port) return null;
+  const id = DRIVE_FOLDER_PATH.exec(url.pathname)?.[1];
+  return id ? `https://drive.google.com/drive/folders/${id}` : null;
+}
 
 /* Lokalny tryb testowy: LEAD_DRY_RUN=1 udaje udaną wysyłkę bez wywołania
    integracji. W buildzie produkcyjnym jest ignorowany, żeby na Vercel nie
@@ -18,9 +54,13 @@ const dryRun = process.env.LEAD_DRY_RUN === "1" && process.env.NODE_ENV !== "pro
  * lead-email.ts). Dodatek do zapisu w Google — nie jest miejscem
  * przechowywania leadów. Odbiorca wyłącznie z CONTACT_TO.
  * Wymaga RESEND_API_KEY, CONTACT_TO i CONTACT_FROM — bez nich nic nie wysyła
- * i zwraca `not_configured`.
+ * i zwraca `not_configured`. `folderUrl` (z saveLeadToSheet) dodaje do maila
+ * link do folderu z załącznikami; same pliki nadal są w załączniku.
  */
-export async function sendLeadEmail(lead: LeadSubmission): Promise<DeliveryResult> {
+export async function sendLeadEmail(
+  lead: LeadSubmission,
+  folderUrl: string | null = null,
+): Promise<DeliveryResult> {
   if (dryRun) {
     console.info(`[wycena] LEAD_DRY_RUN: e-mail pominięty, załączniki: ${lead.attachments.length}`);
     return { ok: true };
@@ -48,8 +88,8 @@ export async function sendLeadEmail(lead: LeadSubmission): Promise<DeliveryResul
            lead-email.ts dodatkowo odcina CR/LF od Subject i Reply-To. */
         reply_to: leadReplyTo(lead),
         subject: leadEmailSubject(lead),
-        html: leadEmailHtml(lead),
-        text: leadEmailText(lead),
+        html: leadEmailHtml(lead, folderUrl),
+        text: leadEmailText(lead, folderUrl),
         attachments: lead.attachments.length
           ? lead.attachments.map((a) => ({
               filename: a.filename,
@@ -90,10 +130,10 @@ const WEBHOOK_TIMEOUT_MS = 45_000;
  * stronie serwera). Sukces to wyłącznie HTTP OK z JSON `{ ok: true }` —
  * samo 200 nie wystarcza, bo Apps Script zwraca 200 także przy błędzie.
  */
-export async function saveLeadToSheet(lead: LeadSubmission): Promise<DeliveryResult> {
+export async function saveLeadToSheet(lead: LeadSubmission): Promise<SheetResult> {
   if (dryRun) {
     console.info(`[wycena] LEAD_DRY_RUN: zapis w Google pominięty, załączniki: ${lead.attachments.length}`);
-    return { ok: true };
+    return { ok: true, folderUrl: null };
   }
 
   const url = process.env.GOOGLE_LEADS_WEBHOOK_URL;
@@ -135,7 +175,16 @@ export async function saveLeadToSheet(lead: LeadSubmission): Promise<DeliveryRes
       console.error(`[wycena] Apps Script nie zapisał zgłoszenia: HTTP ${res.status}${safeCode}`);
       return { ok: false, reason: "failed" };
     }
-    return { ok: true };
+
+    /* Folder powstaje tylko przy załącznikach. Link, który nie przejdzie
+       walidacji, jest pomijany — zapis w Google nadal liczy się jako sukces. */
+    const rawFolderUrl =
+      typeof data === "object" && data !== null && "folderUrl" in data ? data.folderUrl : undefined;
+    const folderUrl = lead.attachments.length ? driveFolderUrl(rawFolderUrl) : null;
+    if (lead.attachments.length && rawFolderUrl && !folderUrl) {
+      console.warn("[wycena] Apps Script zwrócił nieprawidłowy folderUrl — link pominięty");
+    }
+    return { ok: true, folderUrl };
   } catch (e) {
     const timeout = e instanceof Error && e.name === "TimeoutError";
     console.error(`[wycena] ${timeout ? "Przekroczony czas odpowiedzi" : "Brak połączenia z"} Apps Script`);

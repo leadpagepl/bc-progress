@@ -64,8 +64,10 @@ export async function POST(req: Request) {
 
   /* Lead jest już w Sheets/Drive. E-mail to tylko powiadomienie: rusza po
      wysłaniu odpowiedzi, więc jego błąd ani timeout nie zmienią wyniku
-     formularza. Porażkę loguje sendLeadEmail(). */
-  after(() => sendLeadEmail(lead));
+     formularza. Porażkę loguje sendLeadEmail(). Link do folderu z plikami
+     przychodzi z Google już zwalidowany (albo null). */
+  const { folderUrl } = saved;
+  after(() => sendLeadEmail(lead, folderUrl));
 
   return NextResponse.json({ ok: true });
 }
