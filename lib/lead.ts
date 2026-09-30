@@ -36,6 +36,9 @@ export type LeadSubmission = {
   reference: string | null;
   attachments: LeadAttachment[];
   submittedAt: string;
+  /** UUID v4 (małe litery) jednego logicznego zgłoszenia — ten sam przy
+   *  każdym ponowieniu, więc Apps Script nie zapisze leada drugi raz. */
+  submissionId: string;
 };
 
 /* C0 i C1 bez \t i \n oraz znaki sterujące kierunkiem tekstu — te potrafią
@@ -82,6 +85,14 @@ export function isValidPhone(v: string) {
   const { max, minDigits, maxDigits } = leadLimits.phone;
   const digits = v.replace(/\D/g, "").length;
   return v.length <= max && PHONE.test(v) && digits >= minDigits && digits <= maxDigits;
+}
+
+/* UUID v4: wersja 4 i wariant RFC 4122 (8, 9, a, b). Kotwice wykluczają
+   dłuższe wartości, spacje i znaki sterujące. */
+const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+export function isValidSubmissionId(v: unknown): v is string {
+  return typeof v === "string" && UUID_V4.test(v);
 }
 
 /** Allowlista: przyjmujemy wyłącznie identyfikatory z `projectTypes`. */

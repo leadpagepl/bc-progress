@@ -8,6 +8,7 @@ import {
   isValidName,
   isValidPhone,
   isValidReference,
+  isValidSubmissionId,
   normalizeText,
   projectTypeLabel,
   type LeadAttachment,
@@ -141,8 +142,12 @@ export async function validateLead(form: FormData): Promise<LeadSubmission | nul
   const description = normalizeText(form.get("opis"), { multiline: true });
   const reference = normalizeText(form.get("realizacja"));
   const projectType = projectTypeLabel(normalizeText(form.get("typ")));
+  /* Klucz idempotencji z przeglądarki — wymagany i sprawdzany ściśle, bez
+     normalizacji. Trafia wyłącznie do payloadu Google, nigdzie więcej. */
+  const submissionId = form.get("submissionId");
 
   const valid =
+    isValidSubmissionId(submissionId) &&
     projectType !== null &&
     isValidName(name) &&
     isValidPhone(phone) &&
@@ -166,6 +171,7 @@ export async function validateLead(form: FormData): Promise<LeadSubmission | nul
     reference: reference || null,
     attachments,
     submittedAt: new Date().toISOString(),
+    submissionId: submissionId.toLowerCase(),
   };
 }
 

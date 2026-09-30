@@ -65,7 +65,10 @@ export async function POST(req: Request) {
   /* Lead jest już w Sheets/Drive. E-mail to tylko powiadomienie: rusza po
      wysłaniu odpowiedzi, więc jego błąd ani timeout nie zmienią wyniku
      formularza. Porażkę loguje sendLeadEmail(). Link do folderu z plikami
-     przychodzi z Google już zwalidowany (albo null). */
+     przychodzi z Google już zwalidowany (albo null).
+     Ponowienie (`saved.duplicate`) też kończy się mailem: pierwsza próba mogła
+     zapisać lead, ale urwać się przed after() — bez tego powiadomienie by
+     nie dotarło. Przy duplikacie folderUrl bywa null, wtedy mail jest bez linku. */
   const { folderUrl } = saved;
   after(() => sendLeadEmail(lead, folderUrl));
 
