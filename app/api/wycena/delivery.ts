@@ -77,7 +77,10 @@ export async function sendLeadEmail(lead: LeadSubmission): Promise<DeliveryResul
   }
 }
 
-const WEBHOOK_TIMEOUT_MS = 15_000;
+/* Apps Script z zapisem plików na Drive potrafi odpowiadać ponad 15 s, a po
+   przerwaniu i tak kończy zapis — krótszy limit dawał błąd w UI przy
+   zapisanym leadzie. Musi zmieścić się w maxDuration z route.ts. */
+const WEBHOOK_TIMEOUT_MS = 45_000;
 
 /**
  * Zapis leada przez webhook Google Apps Script: wiersz w Sheets, folder
