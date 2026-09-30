@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import type { RefObject } from "react";
 import { company } from "@/lib/content";
 import { leadLimits } from "@/lib/lead";
 import type { Dane, Stan } from "./WycenaForm";
 import { Naglowek, Pole, Przycisk, Strzalka } from "./Pola";
+import { Turnstile, type TurnstileHandle } from "./Turnstile";
 
 export function KrokKontakt({
   dane,
@@ -13,6 +15,7 @@ export function KrokKontakt({
   ustaw,
   onWstecz,
   onSubmit,
+  turnstile,
 }: {
   dane: Dane;
   bledy: Record<string, string>;
@@ -20,6 +23,7 @@ export function KrokKontakt({
   ustaw: (p: Partial<Dane>) => void;
   onWstecz: () => void;
   onSubmit: (e: React.FormEvent) => void;
+  turnstile: RefObject<TurnstileHandle | null>;
 }) {
   const wysylanie = stan === "submitting";
 
@@ -110,6 +114,8 @@ export function KrokKontakt({
             {bledy.zgoda}
           </p>
         ) : null}
+        {/* Niewidoczny, dopóki Cloudflare nie poprosi o interakcję. */}
+        <Turnstile ref={turnstile} />
       </div>
 
       <div className="flex flex-col gap-3 sm:flex-row-reverse sm:justify-end">
@@ -165,6 +171,31 @@ export function KrokKontakt({
           <span className="text-graphite">
             <strong>Nie udało się wysłać zapytania.</strong> Serwer nie przyjął
             danych albo załącznika. Sprawdź pola i pliki, potem spróbuj ponownie.
+          </span>
+        )}
+        {stan === "verification" && (
+          <span className="text-graphite">
+            <strong>Nie udało się potwierdzić zgłoszenia.</strong> To
+            zabezpieczenie przed botami. Dane zostały w formularzu — spróbuj
+            wysłać jeszcze raz. Jeśli problem się powtarza, napisz do nas na{" "}
+            <a
+              className="underline"
+              href={company.instagram}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Instagramie
+            </a>{" "}
+            lub{" "}
+            <a
+              className="underline"
+              href={company.facebook}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Facebooku
+            </a>
+            .
           </span>
         )}
       </p>

@@ -16,6 +16,7 @@ import { KrokInwestycja } from "./KrokInwestycja";
 import { KrokKontakt } from "./KrokKontakt";
 import { Postep } from "./Postep";
 import { Dziekujemy } from "./Dziekujemy";
+import type { TurnstileHandle } from "./Turnstile";
 
 export type Dane = {
   typ: string;
@@ -39,8 +40,15 @@ const PUSTE: Dane = {
   zgoda: false,
 };
 
-/** `invalid` i `unavailable` to odmiany błędu z własnym komunikatem. */
-export type Stan = "idle" | "submitting" | "success" | "error" | "invalid" | "unavailable";
+/** `invalid`, `unavailable` i `verification` to odmiany błędu z własnym komunikatem. */
+export type Stan =
+  | "idle"
+  | "submitting"
+  | "success"
+  | "error"
+  | "invalid"
+  | "unavailable"
+  | "verification";
 
 /**
  * Formularz zapytania o wycenę. Żyje wewnątrz modala, więc nie ma tu żadnej
@@ -57,8 +65,9 @@ export function WycenaForm({ realizacja }: { realizacja?: string }) {
   /* Blokada niezależna od renderu: drugi klik albo Enter w trakcie wysyłki
      nie tworzy drugiego żądania, zanim przycisk zdąży się wyłączyć. */
   const wysylka = useRef(false);
+  const turnstile = useRef<TurnstileHandle>(null);
 
-  const ustaw = (patch: Partial<Dane>) => setDane((d) => ({ ...d, ...patch }));
+  const ustaw =(patch: Partial<Dane>) => setDane((d) => ({ ...d, ...patch }));
 
   /* Krótkie przejście między krokami. Bez skoku układu. */
   useEffect(() => {
@@ -123,6 +132,17 @@ export function WycenaForm({ realizacja }: { realizacja?: string }) {
 
     wysylka.current = true;
     setStan("submitting");
+
+    /* Token Turnstile jest jednorazowy. Bez niego serwer i tak odrzuci
+       zgłoszenie, więc nie wysyłamy żądania na próżno. */
+    const token = await turnstile.current?.token();
+    if (!token) {
+      turnstile.current?.reset();
+      setStan("verification");
+      wysylka.current = false;
+      return;
+    }
+
     const fd = new FormData();
     fd.set("typ", dane.typ);
     fd.set("lokalizacja", dane.lokalizacja);
@@ -135,17 +155,23 @@ export function WycenaForm({ realizacja }: { realizacja?: string }) {
     fd.set("firma", "");
     if (realizacja) fd.set("realizacja", realizacja);
     dane.pliki.forEach((f) => fd.append("pliki", f));
+    fd.set("cf-turnstile-response", token);
 
+    let wyslane = false;
     try {
       const res = await fetch("/api/wycena", { method: "POST", body: fd });
       const data = await res.json().catch(() => null);
-      if (res.ok && data?.ok) setStan("success");
+      wyslane = Boolean(res.ok && data?.ok);
+      if (wyslane) setStan("success");
+      else if (data?.code === "VERIFICATION_FAILED") setStan("verification");
       else if (data?.code === "SERVICE_UNAVAILABLE") setStan("unavailable");
       else if (data?.code === "VALIDATION_ERROR") setStan("invalid");
       else setStan("error");
     } catch {
       setStan("error");
     } finally {
+      /* Serwer mógł już zużyć token — kolejna próba dostaje świeży. */
+      if (!wyslane) turnstile.current?.reset();
       wysylka.current = false;
     }
   }
@@ -173,6 +199,7 @@ export function WycenaForm({ realizacja }: { realizacja?: string }) {
             ustaw={ustaw}
             onWstecz={() => setKrok(1)}
             onSubmit={wyslij}
+            turnstile={turnstile}
           />
         )}
       </div>

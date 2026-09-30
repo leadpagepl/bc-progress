@@ -45,6 +45,12 @@ Resend (`sendLeadEmail` w `delivery.ts`, szablon w `lead-email.ts`) na adres
 z `CONTACT_TO`. To tylko powiadomienie: brak zmiennych `RESEND_API_KEY`,
 `CONTACT_TO`, `CONTACT_FROM` albo błąd Resend nie zmienia wyniku formularza.
 
+Przed zapisem zgłoszenie musi przejść Cloudflare Turnstile
+(`NEXT_PUBLIC_TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY`). Weryfikacja działa
+„fail closed”: bez tokenu, bez sekretu albo przy błędzie Siteverify API zwraca
+`VERIFICATION_FAILED` i nie wywołuje Google ani Resend. Lokalnie można użyć
+kluczy testowych Cloudflare (patrz `.env.example`).
+
 Lokalnie `LEAD_DRY_RUN=1` pozwala przetestować formularz bez wywołania
 integracji; w buildzie produkcyjnym ta zmienna jest ignorowana.
 
