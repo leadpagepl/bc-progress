@@ -40,6 +40,17 @@ const PUSTE: Dane = {
   zgoda: false,
 };
 
+/** UUID v4 z kryptograficznego generatora przeglądarki. Safari < 15.4 nie ma
+ *  `randomUUID`, więc wtedy te same 122 losowe bity dają `getRandomValues`. */
+function newSubmissionId(): string {
+  if (typeof crypto.randomUUID === "function") return crypto.randomUUID();
+  const b = crypto.getRandomValues(new Uint8Array(16));
+  b[6] = (b[6] & 0x0f) | 0x40;
+  b[8] = (b[8] & 0x3f) | 0x80;
+  const h = Array.from(b, (x) => x.toString(16).padStart(2, "0")).join("");
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+}
+
 /** `invalid`, `unavailable` i `verification` to odmiany błędu z własnym komunikatem. */
 export type Stan =
   | "idle"
@@ -66,6 +77,13 @@ export function WycenaForm({ realizacja }: { realizacja?: string }) {
      nie tworzy drugiego żądania, zanim przycisk zdąży się wyłączyć. */
   const wysylka = useRef(false);
   const turnstile = useRef<TurnstileHandle>(null);
+  /* Jeden ID na logiczne zgłoszenie: powstaje przy pierwszej poprawnej próbie
+     wysyłki i zostaje przy każdym ponowieniu (Turnstile, sieć, Google), żeby
+     Apps Script nie zapisał tego samego leada drugi raz. Nowa instancja
+     formularza (kolejne otwarcie modala) dostaje nowy ID. Niezależny od
+     tokenu Turnstile, który jest jednorazowy i resetowany po porażce. */
+  const submissionId = useRef<string | null>(null);
+  const getSubmissionId = () => (submissionId.current ??= newSubmissionId());
 
   const ustaw =(patch: Partial<Dane>) => setDane((d) => ({ ...d, ...patch }));
 
@@ -132,6 +150,7 @@ export function WycenaForm({ realizacja }: { realizacja?: string }) {
 
     wysylka.current = true;
     setStan("submitting");
+    const id = getSubmissionId();
 
     /* Token Turnstile jest jednorazowy. Bez niego serwer i tak odrzuci
        zgłoszenie, więc nie wysyłamy żądania na próżno. */
@@ -156,6 +175,7 @@ export function WycenaForm({ realizacja }: { realizacja?: string }) {
     if (realizacja) fd.set("realizacja", realizacja);
     dane.pliki.forEach((f) => fd.append("pliki", f));
     fd.set("cf-turnstile-response", token);
+    fd.set("submissionId", id);
 
     let wyslane = false;
     try {

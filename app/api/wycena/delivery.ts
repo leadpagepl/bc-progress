@@ -8,8 +8,11 @@ import { leadEmailHtml, leadEmailSubject, leadEmailText, leadReplyTo } from "./l
 
 type DeliveryFailure = { ok: false; reason: "not_configured" | "failed" };
 export type DeliveryResult = { ok: true } | DeliveryFailure;
-/** Wynik zapisu w Google: przy sukcesie zwalidowany link do folderu z załącznikami. */
-export type SheetResult = { ok: true; folderUrl: string | null } | DeliveryFailure;
+/** Wynik zapisu w Google: przy sukcesie zwalidowany link do folderu z załącznikami
+ *  i informacja, czy Apps Script rozpoznał ponowienie już zapisanego zgłoszenia. */
+export type SheetResult =
+  | { ok: true; duplicate: boolean; folderUrl: string | null }
+  | DeliveryFailure;
 
 /* ID folderu Drive: litery, cyfry, „-” i „_”. */
 const DRIVE_FOLDER_PATH = /^\/drive\/(?:u\/\d+\/)?folders\/([A-Za-z0-9_-]{10,200})\/?$/;
@@ -133,7 +136,7 @@ const WEBHOOK_TIMEOUT_MS = 45_000;
 export async function saveLeadToSheet(lead: LeadSubmission): Promise<SheetResult> {
   if (dryRun) {
     console.info(`[wycena] LEAD_DRY_RUN: zapis w Google pominięty, załączniki: ${lead.attachments.length}`);
-    return { ok: true, folderUrl: null };
+    return { ok: true, duplicate: false, folderUrl: null };
   }
 
   const url = process.env.GOOGLE_LEADS_WEBHOOK_URL;
@@ -148,6 +151,9 @@ export async function saveLeadToSheet(lead: LeadSubmission): Promise<SheetResult
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         secret,
+        /* Klucz idempotencji: Apps Script pod blokadą sprawdza, czy ten ID
+           jest już w arkuszu, i wtedy nie tworzy drugiego wiersza ani folderu. */
+        submissionId: lead.submissionId,
         name: lead.name,
         phone: lead.phone,
         email: lead.email ?? "",
@@ -184,7 +190,13 @@ export async function saveLeadToSheet(lead: LeadSubmission): Promise<SheetResult
     if (lead.attachments.length && rawFolderUrl && !folderUrl) {
       console.warn("[wycena] Apps Script zwrócił nieprawidłowy folderUrl — link pominięty");
     }
-    return { ok: true, folderUrl };
+
+    /* Tylko jawne `true` oznacza ponowienie; brak pola albo inna wartość to
+       nowe zgłoszenie. Duplikat to sukces — lead jest już w arkuszu. */
+    const duplicate =
+      typeof data === "object" && data !== null && "duplicate" in data && data.duplicate === true;
+    if (duplicate) console.info("[wycena] Apps Script: zgłoszenie już zapisane — ponowienie bez nowego wiersza");
+    return { ok: true, duplicate, folderUrl };
   } catch (e) {
     const timeout = e instanceof Error && e.name === "TimeoutError";
     console.error(`[wycena] ${timeout ? "Przekroczony czas odpowiedzi" : "Brak połączenia z"} Apps Script`);
