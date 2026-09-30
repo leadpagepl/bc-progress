@@ -21,6 +21,7 @@ export const runtime = "nodejs";
 type ErrorCode =
   | "VALIDATION_ERROR"
   | "SPAM"
+  | "VERIFICATION_FAILED"
   | "RATE_LIMITED"
   | "SERVICE_UNAVAILABLE"
   | "DELIVERY_FAILED";
@@ -36,8 +37,12 @@ export async function POST(req: Request) {
   if (form === "too_large") return odmowa("VALIDATION_ERROR", 413);
   if (form === "invalid") return odmowa("VALIDATION_ERROR", 400);
 
-  if (looksLikeSpam(form) || !(await verifyTurnstile(form.get("cf-turnstile-response")))) {
-    return odmowa("SPAM", 400);
+  if (looksLikeSpam(form)) return odmowa("SPAM", 400);
+
+  /* Turnstile przed walidacją i przed Google/Resend: bez potwierdzenia
+     serwer nie czyta plików i niczego nie zapisuje ani nie wysyła. */
+  if (!(await verifyTurnstile(req, form.get("cf-turnstile-response")))) {
+    return odmowa("VERIFICATION_FAILED", 403);
   }
 
   const lead = await validateLead(form);

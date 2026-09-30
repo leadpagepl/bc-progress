@@ -6,14 +6,18 @@ const isDev = process.env.NODE_ENV === "development";
    a next/image i komponenty renderują atrybuty style — stąd 'unsafe-inline'.
    Ścisły CSP (nonce) wymagałby middleware i renderowania dynamicznego.
    'unsafe-eval' tylko w dev: potrzebuje go React i webpack w trybie dev.
-   frame-src: osadzona mapa Google (lib/content.ts → mapEmbedUrl). */
+   frame-src: osadzona mapa Google (lib/content.ts → mapEmbedUrl).
+   challenges.cloudflare.com: skrypt i iframe Turnstile w formularzu wyceny —
+   dokładnie te dwie dyrektywy, których wymaga Cloudflare. */
+const TURNSTILE = "https://challenges.cloudflare.com";
+
 const csp = [
   "default-src 'self'",
-  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
+  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""} ${TURNSTILE}`,
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data:",
   "font-src 'self'",
-  "frame-src https://www.google.com",
+  `frame-src https://www.google.com ${TURNSTILE}`,
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",
