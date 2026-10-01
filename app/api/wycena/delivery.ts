@@ -1,4 +1,5 @@
 import type { LeadSubmission } from "@/lib/lead";
+import { callAppsScript } from "./apps-script";
 import { leadEmailHtml, leadEmailSubject, leadEmailText, leadReplyTo } from "./lead-email";
 
 /**
@@ -122,7 +123,8 @@ export async function sendLeadEmail(
 
 /* Apps Script z zapisem plików na Drive potrafi odpowiadać ponad 15 s, a po
    przerwaniu i tak kończy zapis — krótszy limit dawał błąd w UI przy
-   zapisanym leadzie. Musi zmieścić się w maxDuration z route.ts. */
+   zapisanym leadzie. Jeden wspólny budżet na POST i odczyt przekierowania;
+   musi zmieścić się w maxDuration z route.ts. */
 const WEBHOOK_TIMEOUT_MS = 45_000;
 
 /**
@@ -143,63 +145,44 @@ export async function saveLeadToSheet(lead: LeadSubmission): Promise<SheetResult
   const secret = process.env.GOOGLE_LEADS_WEBHOOK_SECRET;
   if (!url || !secret) return { ok: false, reason: "not_configured" };
 
-  try {
-    /* Apps Script odpowiada przekierowaniem na googleusercontent.com z wynikiem
-       doPost — fetch podąża za nim sam. */
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        secret,
-        /* Klucz idempotencji: Apps Script pod blokadą sprawdza, czy ten ID
-           jest już w arkuszu, i wtedy nie tworzy drugiego wiersza ani folderu. */
-        submissionId: lead.submissionId,
-        name: lead.name,
-        phone: lead.phone,
-        email: lead.email ?? "",
-        projectType: lead.projectType,
-        location: lead.location,
-        description: lead.description,
-        realization: lead.reference ?? "",
-        attachments: lead.attachments.map((a) => ({
-          name: a.filename,
-          mimeType: a.contentType,
-          base64: Buffer.from(a.data).toString("base64"),
-        })),
-      }),
-      redirect: "follow",
-      cache: "no-store",
-      signal: AbortSignal.timeout(WEBHOOK_TIMEOUT_MS),
-    });
+  /* Walidacja adresu, POST, jawne przekierowanie ContentService i wspólny
+     limit czasu: apps-script.ts. Sekret trafia wyłącznie do treści POST. */
+  const res = await callAppsScript(
+    url,
+    {
+      secret,
+      /* Klucz idempotencji: Apps Script pod blokadą sprawdza, czy ten ID
+         jest już w arkuszu, i wtedy nie tworzy drugiego wiersza ani folderu. */
+      submissionId: lead.submissionId,
+      name: lead.name,
+      phone: lead.phone,
+      email: lead.email ?? "",
+      projectType: lead.projectType,
+      location: lead.location,
+      description: lead.description,
+      realization: lead.reference ?? "",
+      attachments: lead.attachments.map((a) => ({
+        name: a.filename,
+        mimeType: a.contentType,
+        base64: Buffer.from(a.data).toString("base64"),
+      })),
+    },
+    WEBHOOK_TIMEOUT_MS,
+  );
+  if (!res.ok) return res;
+  const { data } = res;
 
-    const data: unknown = await res.json().catch(() => null);
-    const ok = typeof data === "object" && data !== null && (data as { ok?: unknown }).ok === true;
-    if (!res.ok || !ok) {
-      /* Treść odpowiedzi zostaje na serwerze; w logu tylko status i krótki kod. */
-      const code = (data as { code?: unknown } | null)?.code;
-      const safeCode = typeof code === "string" && /^[\w-]{1,40}$/.test(code) ? ` (${code})` : "";
-      console.error(`[wycena] Apps Script nie zapisał zgłoszenia: HTTP ${res.status}${safeCode}`);
-      return { ok: false, reason: "failed" };
-    }
-
-    /* Folder powstaje tylko przy załącznikach. Link, który nie przejdzie
-       walidacji, jest pomijany — zapis w Google nadal liczy się jako sukces. */
-    const rawFolderUrl =
-      typeof data === "object" && data !== null && "folderUrl" in data ? data.folderUrl : undefined;
-    const folderUrl = lead.attachments.length ? driveFolderUrl(rawFolderUrl) : null;
-    if (lead.attachments.length && rawFolderUrl && !folderUrl) {
-      console.warn("[wycena] Apps Script zwrócił nieprawidłowy folderUrl — link pominięty");
-    }
-
-    /* Tylko jawne `true` oznacza ponowienie; brak pola albo inna wartość to
-       nowe zgłoszenie. Duplikat to sukces — lead jest już w arkuszu. */
-    const duplicate =
-      typeof data === "object" && data !== null && "duplicate" in data && data.duplicate === true;
-    if (duplicate) console.info("[wycena] Apps Script: zgłoszenie już zapisane — ponowienie bez nowego wiersza");
-    return { ok: true, duplicate, folderUrl };
-  } catch (e) {
-    const timeout = e instanceof Error && e.name === "TimeoutError";
-    console.error(`[wycena] ${timeout ? "Przekroczony czas odpowiedzi" : "Brak połączenia z"} Apps Script`);
-    return { ok: false, reason: "failed" };
+  /* Folder powstaje tylko przy załącznikach. Link, który nie przejdzie
+     walidacji, jest pomijany — zapis w Google nadal liczy się jako sukces. */
+  const rawFolderUrl = data.folderUrl;
+  const folderUrl = lead.attachments.length ? driveFolderUrl(rawFolderUrl) : null;
+  if (lead.attachments.length && rawFolderUrl && !folderUrl) {
+    console.warn("[wycena] Apps Script zwrócił nieprawidłowy folderUrl — link pominięty");
   }
+
+  /* Tylko jawne `true` oznacza ponowienie; brak pola albo inna wartość to
+     nowe zgłoszenie. Duplikat to sukces — lead jest już w arkuszu. */
+  const duplicate = data.duplicate === true;
+  if (duplicate) console.info("[wycena] Apps Script: zgłoszenie już zapisane — ponowienie bez nowego wiersza");
+  return { ok: true, duplicate, folderUrl };
 }
