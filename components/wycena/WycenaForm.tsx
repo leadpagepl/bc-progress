@@ -65,7 +65,14 @@ export type Stan =
  * Formularz zapytania o wycenę. Żyje wewnątrz modala, więc nie ma tu żadnej
  * oprawy strony — tylko postęp, dwa kroki i ekran po wysyłce.
  */
-export function WycenaForm({ realizacja }: { realizacja?: string }) {
+export function WycenaForm({
+  realizacja,
+  onClose,
+}: {
+  realizacja?: string;
+  /** Zamyka modal — używa go ekran po wysyłce. */
+  onClose: () => void;
+}) {
   const [krok, setKrok] = useState<1 | 2>(1);
   const [dane, setDane] = useState<Dane>(PUSTE);
   const [stan, setStan] = useState<Stan>("idle");
@@ -196,7 +203,7 @@ export function WycenaForm({ realizacja }: { realizacja?: string }) {
     }
   }
 
-  if (stan === "success") return <Dziekujemy />;
+  if (stan === "success") return <Dziekujemy onClose={onClose} />;
 
   return (
     <div>

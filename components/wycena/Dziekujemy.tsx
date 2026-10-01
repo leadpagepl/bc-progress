@@ -6,7 +6,7 @@ import { gsap, useGsap } from "@/lib/gsap";
 import { Logo } from "@/components/Logo";
 
 /** Ekran po faktycznie udanej wysyłce. Nie pojawia się w żadnym innym stanie. */
-export function Dziekujemy() {
+export function Dziekujemy({ onClose }: { onClose: () => void }) {
   const root = useRef<HTMLDivElement>(null);
 
   useGsap(root, () => {
@@ -66,16 +66,20 @@ export function Dziekujemy() {
           Otrzymaliśmy Twoje zapytanie. Skontaktujemy się z Tobą.
         </p>
 
-        <Link
-          href="/"
-          className="dz-in group mt-10 inline-flex items-center justify-between gap-6 bg-graphite px-7 py-5 text-[12px] font-bold tracking-[0.16em] text-bone uppercase opacity-0 transition-colors duration-300 hover:bg-yellow hover:text-graphite"
+        {/* Przycisk, nie link: ekran żyje w modalu na tej samej stronie, więc
+            nawigacja do „/” nic by nie zmieniła. Zamknięcie modala odmontowuje
+            formularz — kolejne otwarcie zaczyna od pustego, z nowym submissionId. */}
+        <button
+          type="button"
+          onClick={onClose}
+          className="dz-in group mt-10 inline-flex cursor-pointer items-center justify-between gap-6 bg-graphite px-7 py-5 text-[12px] font-bold tracking-[0.16em] text-bone uppercase opacity-0 transition-colors duration-300 hover:bg-yellow hover:text-graphite"
           style={{ transform: "translateY(12px)" }}
         >
           Wróć na stronę
           <svg viewBox="0 0 24 12" fill="none" className="w-5 transition-transform duration-400 ease-[var(--ease-out-quint)] group-hover:translate-x-1.5" aria-hidden="true">
             <path d="M0 6h22M17 1l5 5-5 5" stroke="currentColor" strokeWidth="1.6" />
           </svg>
-        </Link>
+        </button>
       </div>
     </div>
   );

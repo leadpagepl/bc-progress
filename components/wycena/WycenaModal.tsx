@@ -220,7 +220,7 @@ export function WycenaModal({
               </p>
             </div>
 
-            <WycenaForm realizacja={realizacja} />
+            <WycenaForm realizacja={realizacja} onClose={onClose} />
           </div>
         </div>
       </div>
