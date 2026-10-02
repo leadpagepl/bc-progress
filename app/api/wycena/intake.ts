@@ -14,6 +14,7 @@ import {
   type LeadAttachment,
   type LeadSubmission,
 } from "@/lib/lead";
+import { clientIp } from "./rate-limit";
 
 /**
  * Wejście API wyceny: odczyt żądania, sygnały antyspamowe i walidacja.
@@ -41,31 +42,7 @@ export async function readForm(req: Request): Promise<FormData | "too_large" | "
  * Antyspam — tanie sygnały, zanim serwer zacznie czytać pliki
  * ---------------------------------------------------------------- */
 
-/* TYMCZASOWE. To NIE jest produkcyjny, rozproszony rate limiter: licznik żyje
-   w pamięci jednej instancji funkcji, na Vercel każda instancja liczy osobno,
-   a cold start go zeruje. Odsiewa tylko prymitywne serie z jednego adresu.
-   TODO(faza 2): durable rate limiting — wspólny magazyn albo reguła WAF. */
-const hits = new Map<string, number[]>();
-const WINDOW_MS = 10 * 60 * 1000;
-const MAX_PER_WINDOW = 5;
-
-/* Na Vercel x-forwarded-for ustawia platforma, klient go nie nadpisze. */
-function clientIp(req: Request) {
-  return (
-    req.headers.get("x-forwarded-for")?.split(",")[0].trim() ||
-    req.headers.get("x-real-ip") ||
-    null
-  );
-}
-
-export function rateLimited(req: Request) {
-  const ip = clientIp(req) ?? "nieznane";
-  const now = Date.now();
-  const recent = (hits.get(ip) ?? []).filter((t) => now - t < WINDOW_MS);
-  recent.push(now);
-  hits.set(ip, recent);
-  return recent.length > MAX_PER_WINDOW;
-}
+/* Limit zapytań: reguła Vercel WAF (poza kodem) + lokalny licznik w rate-limit.ts. */
 
 const MIN_FILL_MS = 3000;
 

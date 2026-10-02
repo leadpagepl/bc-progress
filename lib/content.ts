@@ -15,6 +15,8 @@ export const company = {
   nip: "7352934283",
   regon: "542309226",
   registered: "lipiec 2025",
+  /** Publiczny numer kontaktowy firmy, potwierdzony przez klienta. */
+  phone: "507 862 730",
   address: {
     line1: "Osiedle Równie 2",
     line2: "34-452 Ochotnica Dolna",

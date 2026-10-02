@@ -51,6 +51,11 @@ Przed zapisem zgłoszenie musi przejść Cloudflare Turnstile
 `VERIFICATION_FAILED` i nie wywołuje Google ani Resend. Lokalnie można użyć
 kluczy testowych Cloudflare (patrz `.env.example`).
 
+Limit zapytań: głównym limiterem jest reguła Vercel WAF dla
+`POST /api/wycena` (ustawiana w panelu Vercel, nie w repozytorium). W kodzie
+(`rate-limit.ts`) działa tylko lokalny licznik w pamięci instancji — druga,
+tania warstwa, a nie rozproszony rate limiter.
+
 Lokalnie `LEAD_DRY_RUN=1` pozwala przetestować formularz bez wywołania
 integracji; w buildzie produkcyjnym ta zmienna jest ignorowana.
 

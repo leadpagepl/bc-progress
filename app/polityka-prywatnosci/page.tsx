@@ -8,12 +8,15 @@ export const metadata: Metadata = {
   title: "Polityka prywatności",
   description:
     "Jakie dane zbiera strona BC PROGRES sp. z o.o. i co się z nimi dzieje.",
+  alternates: { canonical: "/polityka-prywatnosci" },
   robots: { index: true, follow: true },
 };
 
 /**
- * Dokument opisuje wyłącznie to, co strona faktycznie robi w obecnej wersji.
- * Wymaga finalnej akceptacji prawnej i biznesowej przed publikacją.
+ * Dokument opisuje wyłącznie to, co strona faktycznie robi w obecnej wersji:
+ * formularz wyceny (app/api/wycena), Turnstile i osadzoną mapę. Zmiana
+ * którejkolwiek z tych integracji wymaga aktualizacji tej strony.
+ * Treść nie była weryfikowana przez prawnika.
  */
 export default function Polityka() {
   return (
@@ -32,20 +35,15 @@ export default function Polityka() {
         </div>
       </header>
 
-      <main className="gut py-[clamp(3rem,7vw,5.5rem)]">
+      <main
+        id="main-content"
+        tabIndex={-1}
+        className="gut py-[clamp(3rem,7vw,5.5rem)] outline-none"
+      >
         <p className="eyebrow text-grey">Dokument</p>
         <h1 className="mt-5 max-w-[16ch] text-[clamp(2.15rem,6vw,4.25rem)]">
           Polityka prywatności
         </h1>
-
-        <div className="mt-8 border-l-2 border-yellow bg-bone-2 p-6">
-          <p className="max-w-[70ch] text-sm leading-relaxed">
-            <strong>Do zatwierdzenia.</strong> Dokument opisuje tylko te procesy,
-            które strona realizuje w obecnej wersji. Przed publikacją wymaga
-            sprawdzenia przez firmę, w razie potrzeby także przez prawnika,
-            oraz uzupełnienia o dane kontaktowe administratora.
-          </p>
-        </div>
 
         <div className="mt-11 grid gap-x-8 gap-y-10 lg:grid-cols-12">
           <div className="lg:col-span-8 lg:col-start-4">
@@ -55,22 +53,45 @@ export default function Polityka() {
                 {company.address.line2}. KRS {company.krs}, NIP {company.nip},
                 REGON {company.regon}.
               </p>
-              <p className="text-grey">
-                Adres e-mail i numer telefonu do kontaktu w sprawie danych
-                zostaną uzupełnione po potwierdzeniu przez firmę.
+              <p>
+                W sprawach dotyczących danych osobowych możesz skontaktować
+                się z {company.shortName} pod numerem{" "}
+                <a
+                  href={`tel:${company.phone.replace(/\s/g, "")}`}
+                  className="border-b border-graphite/35 pb-0.5 whitespace-nowrap transition-colors hover:border-yellow"
+                >
+                  {company.phone}
+                </a>{" "}
+                lub pisemnie na adres siedziby spółki.
               </p>
             </Article>
 
             <Article title="Jakie dane zbieramy">
               <p>
-                Wyłącznie te, które podasz w formularzu wyceny: rodzaj
-                inwestycji, miejscowość, opis inwestycji, imię, numer telefonu
-                oraz adres e-mail, jeśli go wpiszesz.
+                Te, które podasz w formularzu wyceny: rodzaj inwestycji,
+                miejscowość, opis inwestycji, imię, numer telefonu oraz adres
+                e-mail, jeśli go wpiszesz. Jeśli otwierasz formularz przy
+                konkretnej realizacji, zapisujemy też jej nazwę. Do zapytania
+                dodajemy datę i godzinę wysłania.
               </p>
               <p>
-                Jeśli dołączysz zdjęcia albo projekt, trafiają one razem z
-                zapytaniem na skrzynkę firmy. Nie zapisujemy ich na serwerze
-                strony i nie publikujemy ich nigdzie.
+                Jeśli dołączysz zdjęcia albo projekt, trafiają one do firmy
+                razem z zapytaniem: są zapisywane w folderze zgłoszenia na
+                Dysku Google i dołączane do wiadomości e-mail z powiadomieniem.
+                Nie zapisujemy ich na serwerze strony i nigdzie ich nie
+                publikujemy.
+              </p>
+              <p>
+                Przy wysyłaniu formularza przetwarzane są też dane techniczne:
+                adres IP oraz informacje o przeglądarce i urządzeniu potrzebne
+                do sprawdzenia, czy formularza nie wysyła automat, a także
+                techniczny identyfikator zgłoszenia, dzięki któremu to samo
+                zapytanie nie zapisze się dwa razy. Adresu IP nie zapisujemy
+                razem z zapytaniem.
+              </p>
+              <p>
+                Podanie danych jest dobrowolne, ale bez pól oznaczonych jako
+                wymagane formularz nie zostanie wysłany.
               </p>
               <p>
                 Strona nie korzysta z narzędzi analitycznych, nie wyświetla
@@ -84,6 +105,14 @@ export default function Polityka() {
                 jest Twoja zgoda oraz nasz uzasadniony interes w prowadzeniu
                 korespondencji handlowej.
               </p>
+              <p>
+                Dane techniczne, m.in. adres IP, służą wyłącznie ochronie
+                strony i formularza przed botami i nadużyciami — w tym
+                weryfikacji Cloudflare Turnstile i ograniczaniu liczby
+                zgłoszeń. Podstawą jest nasz uzasadniony interes w ochronie
+                strony i formularza przed nadużyciami oraz w zapewnieniu ich
+                bezpieczeństwa.
+              </p>
             </Article>
 
             <Article title="Jak długo je przechowujemy">
@@ -96,22 +125,80 @@ export default function Polityka() {
 
             <Article title="Komu je przekazujemy">
               <p>
-                Dostawcy hostingu strony oraz, po podłączeniu, dostawcy usługi
-                poczty e-mail, który dostarcza wiadomość z formularza wraz z
-                załącznikami do naszej skrzynki. Nie sprzedajemy danych i nie przekazujemy ich do celów
+                Zapytania otrzymuje i obsługuje {company.shortName}. Stronę,
+                formularz oraz infrastrukturę techniczną, w której zapytania
+                są przetwarzane i przechowywane, utrzymuje w imieniu{" "}
+                {company.shortName} Leadpage (leadpage.pl), marka prowadzona
+                przez Łukasza Czubera, osobę fizyczną.
+              </p>
+              <p>
+                Dane trafiają też do dostawców usług, z których korzysta
+                strona, tylko w zakresie potrzebnym do działania danej usługi:
+              </p>
+              <ul className="flex flex-col gap-3">
+                <li>
+                  <strong>Vercel</strong> — hosting strony i obsługa formularza
+                  po stronie serwera.
+                </li>
+                <li>
+                  <strong>Cloudflare (usługa Turnstile)</strong> — sprawdzenie,
+                  czy formularza nie wysyła automat. Cloudflare otrzymuje w tym
+                  celu dane techniczne, m.in. adres IP oraz informacje o
+                  przeglądarce i urządzeniu. Nie otrzymuje treści zapytania.
+                </li>
+                <li>
+                  <strong>Google (Apps Script, Arkusze Google, Dysk Google)</strong>{" "}
+                  — przyjęcie i przechowywanie zapytań. Dane z formularza są
+                  zapisywane w arkuszu, a załączniki w folderze na Dysku
+                  Google. Dostęp do arkusza i folderu mają tylko upoważnione
+                  osoby z {company.shortName} oraz, w zakresie potrzebnym do
+                  utrzymania usługi, Leadpage i upoważnione osoby
+                  współpracujące z Leadpage.
+                </li>
+                <li>
+                  <strong>Resend</strong> — dostarczenie na skrzynkę firmy
+                  wiadomości e-mail z powiadomieniem o nowym zapytaniu, wraz
+                  z jego treścią i załącznikami.
+                </li>
+                <li>
+                  <strong>Google (Mapy Google)</strong> — mapa dojazdu
+                  osadzona na stronie głównej. Gdy mapa się wczytuje, Twoja
+                  przeglądarka łączy się z serwerami Google, które otrzymują
+                  m.in. adres IP.
+                </li>
+              </ul>
+              <p>
+                Nie sprzedajemy danych i nie przekazujemy ich do celów
                 marketingowych.
               </p>
-              <p className="text-grey">
-                Konkretni dostawcy zostaną wymienieni z nazwy po wyborze
-                hostingu i skrzynki.
+            </Article>
+
+            <Article title="Przekazywanie danych poza EOG">
+              <p>
+                Część dostawców technologicznych, z których korzysta strona,
+                może przetwarzać dane poza Europejskim Obszarem Gospodarczym.
+              </p>
+              <p>
+                Jeżeli w związku z korzystaniem z usług dostawców
+                technologicznych dochodzi do przekazania danych poza
+                Europejski Obszar Gospodarczy, odbywa się ono z zastosowaniem
+                mechanizmów przewidzianych przez RODO, odpowiednich dla danego
+                dostawcy, takich jak decyzja stwierdzająca odpowiedni stopień
+                ochrony lub standardowe klauzule umowne.
               </p>
             </Article>
 
             <Article title="Ciasteczka">
               <p>
-                Strona nie zapisuje ciasteczek analitycznych ani marketingowych.
-                Korzysta wyłącznie z technicznych mechanizmów niezbędnych do
-                wyświetlenia treści.
+                Sama strona nie zapisuje ciasteczek analitycznych ani
+                marketingowych.
+              </p>
+              <p>
+                Dwa elementy pochodzą od zewnętrznych dostawców i działają we
+                własnych ramkach: mapa Google na stronie głównej oraz
+                zabezpieczenie Cloudflare Turnstile w formularzu wyceny. Mogą
+                one zapisywać własne pliki cookie lub korzystać z pamięci
+                przeglądarki na zasadach tych dostawców.
               </p>
             </Article>
 
@@ -121,6 +208,10 @@ export default function Polityka() {
                 ograniczenia przetwarzania, przenoszenia oraz sprzeciwu. Zgodę
                 możesz wycofać w każdej chwili. Przysługuje Ci też skarga do
                 Prezesa Urzędu Ochrony Danych Osobowych.
+              </p>
+              <p>
+                Żeby skorzystać z tych praw, skontaktuj się z nami w sposób
+                podany w części „Administrator danych”.
               </p>
             </Article>
 
