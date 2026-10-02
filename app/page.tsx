@@ -7,12 +7,18 @@ import { OFirmie } from "@/components/OFirmie";
 import { Mapa } from "@/components/Mapa";
 import { Kontakt } from "@/components/Kontakt";
 import { Footer } from "@/components/Footer";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  alternates: { canonical: "/" },
+};
 
 export default function Home() {
   return (
     <>
       <Header />
-      <main>
+      {/* Cel linku „Przejdź do treści” z layoutu; tabIndex przenosi tam fokus. */}
+      <main id="main-content" tabIndex={-1} className="outline-none">
         <Hero />
         <Realizacje />
         <CoRobimy />

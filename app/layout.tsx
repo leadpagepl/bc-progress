@@ -3,6 +3,7 @@ import { Archivo, Geist } from "next/font/google";
 import "./globals.css";
 import { WycenaProvider } from "@/components/wycena/WycenaProvider";
 import { company } from "@/lib/content";
+import { siteUrl } from "@/lib/site";
 
 const archivo = Archivo({
   subsets: ["latin", "latin-ext"],
@@ -17,21 +18,27 @@ const geist = Geist({
   display: "swap",
 });
 
+const OG_IMAGE = "/assets/bc-progres/img/hero-poster.jpg";
+
+const description =
+  "Firma budowlana z Ochotnicy Dolnej. Budowa domów i obiektów, więźby i pokrycia dachowe, hale stalowe, prace ziemne. Zapytaj o wycenę.";
+
+/* Adres canonical ustawia każda strona osobno (alternates w layoucie
+   odziedziczyłyby wszystkie podstrony). */
 export const metadata: Metadata = {
-  metadataBase: new URL("https://bcprogres.pl"),
+  metadataBase: new URL(siteUrl),
   title: {
     default: "BC PROGRES, firma budowlana z Ochotnicy Dolnej",
     template: "%s, BC PROGRES",
   },
-  description:
-    "BC PROGRES sp. z o.o. Budowa domów i obiektów, więźby i pokrycia dachowe, hale stalowe, prace ziemne. Ochotnica Dolna.",
+  description,
   openGraph: {
     type: "website",
     locale: "pl_PL",
     siteName: "BC PROGRES sp. z o.o.",
     title: "BC PROGRES, firma budowlana z Ochotnicy Dolnej",
-    description: "Budowa domów i obiektów. Ochotnica Dolna.",
-    images: ["/assets/bc-progres/img/hero-poster.jpg"],
+    description,
+    images: [OG_IMAGE],
   },
 };
 
@@ -43,7 +50,8 @@ const jsonLd = {
   "@context": "https://schema.org",
   "@type": "GeneralContractor",
   name: company.name,
-  url: "https://bcprogres.pl",
+  url: siteUrl,
+  image: `${siteUrl}${OG_IMAGE}`,
   address: {
     "@type": "PostalAddress",
     streetAddress: company.address.line1,
@@ -72,7 +80,7 @@ export default function RootLayout({
       </head>
       <body>
         <a
-          href="#realizacje"
+          href="#main-content"
           className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:bg-yellow focus:px-4 focus:py-3 focus:text-sm focus:font-semibold focus:text-graphite"
         >
           Przejdź do treści

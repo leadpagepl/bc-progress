@@ -99,8 +99,12 @@ export function KrokKontakt({
           </span>
           <span>
             Zgadzam się na kontakt w sprawie tego zapytania i znam{" "}
+            {/* Nowa karta: modal i wpisane dane zostają, a polityka nie
+                otwiera się pod zasłoniętym tłem. */}
             <Link
               href="/polityka-prywatnosci"
+              target="_blank"
+              rel="noopener noreferrer"
               className="border-b border-graphite/35 pb-0.5 transition-colors hover:border-yellow hover:text-graphite"
             >
               politykę prywatności

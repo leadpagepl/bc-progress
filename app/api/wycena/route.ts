@@ -1,5 +1,6 @@
 import { after, NextResponse } from "next/server";
-import { looksLikeSpam, rateLimited, readForm, validateLead, verifyTurnstile } from "./intake";
+import { looksLikeSpam, readForm, validateLead, verifyTurnstile } from "./intake";
+import { rateLimited } from "./rate-limit";
 import { saveLeadToSheet, sendLeadEmail } from "./delivery";
 
 export const runtime = "nodejs";

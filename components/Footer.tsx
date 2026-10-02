@@ -18,8 +18,9 @@ export function Footer() {
           <ul className="mt-5 flex flex-col gap-3">
             {nav.map((item) => (
               <li key={item.href}>
+                {/* Z ukośnikiem: stopka jest też na podstronie polityki. */}
                 <a
-                  href={item.href}
+                  href={`/${item.href}`}
                   className="text-sm text-bone/75 transition-colors hover:text-yellow"
                 >
                   {item.label}
