@@ -5,9 +5,10 @@ import { saveLeadToSheet, sendLeadEmail } from "./delivery";
 
 export const runtime = "nodejs";
 
-/* Jawny limit funkcji na Vercel: Turnstile (do 8 s) + Apps Script (do 45 s)
-   muszą się zmieścić, a domyślny limit bywa krótszy (10–15 s bez Fluid
-   compute). 60 s to maksimum dozwolone na każdym planie. */
+/* Jawny limit funkcji na Vercel: Turnstile (do 8 s) + Apps Script (do 50 s
+   łącznie z jedynym ponowieniem) muszą się zmieścić, a domyślny limit bywa
+   krótszy (10–15 s bez Fluid compute). 60 s to maksimum dozwolone na każdym
+   planie. */
 export const maxDuration = 60;
 
 /**
