@@ -123,9 +123,12 @@ export async function sendLeadEmail(
 
 /* Apps Script z zapisem plików na Drive potrafi odpowiadać ponad 15 s, a po
    przerwaniu i tak kończy zapis — krótszy limit dawał błąd w UI przy
-   zapisanym leadzie. Jeden wspólny budżet na POST i odczyt przekierowania;
-   musi zmieścić się w maxDuration z route.ts. */
-const WEBHOOK_TIMEOUT_MS = 45_000;
+   zapisanym leadzie. Pierwsza próba (POST + odczyt przekierowania) ma do 45 s,
+   a jedyne ponowienie (po 404 na odczycie) mieści się w tym samym terminie
+   50 s i rusza tylko, gdy zostało co najmniej 5 s — zwykle trafia na szybką
+   odpowiedź `duplicate: true`. Turnstile (do 8 s) + 50 s mieści się w
+   maxDuration z route.ts. */
+const WEBHOOK_TIMING = { totalMs: 50_000, firstAttemptMs: 45_000, minRetryMs: 5_000 };
 
 /**
  * Zapis leada przez webhook Google Apps Script: wiersz w Sheets, folder
@@ -145,8 +148,9 @@ export async function saveLeadToSheet(lead: LeadSubmission): Promise<SheetResult
   const secret = process.env.GOOGLE_LEADS_WEBHOOK_SECRET;
   if (!url || !secret) return { ok: false, reason: "not_configured" };
 
-  /* Walidacja adresu, POST, jawne przekierowanie ContentService i wspólny
-     limit czasu: apps-script.ts. Sekret trafia wyłącznie do treści POST. */
+  /* Walidacja adresu, POST, jawne przekierowanie ContentService, jedno
+     ponowienie po 404 i wspólny termin: apps-script.ts. Sekret trafia
+     wyłącznie do treści POST; ponowienie wysyła te same bajty. */
   const res = await callAppsScript(
     url,
     {
@@ -167,7 +171,7 @@ export async function saveLeadToSheet(lead: LeadSubmission): Promise<SheetResult
         base64: Buffer.from(a.data).toString("base64"),
       })),
     },
-    WEBHOOK_TIMEOUT_MS,
+    WEBHOOK_TIMING,
   );
   if (!res.ok) return res;
   const { data } = res;
