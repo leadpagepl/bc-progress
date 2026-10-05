@@ -15,6 +15,7 @@ import {
   type LeadSubmission,
 } from "@/lib/lead";
 import { clientIp } from "./rate-limit";
+import { verifyTurnstileToken } from "./turnstile";
 
 /**
  * Wejście API wyceny: odczyt żądania, sygnały antyspamowe i walidacja.
@@ -56,54 +57,18 @@ export function looksLikeSpam(form: FormData) {
   return !startedAt || Date.now() - startedAt < MIN_FILL_MS;
 }
 
-const SITEVERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
-const SITEVERIFY_TIMEOUT_MS = 8000;
-/* Limit z dokumentacji Cloudflare. */
-const MAX_TOKEN_LENGTH = 2048;
-
 /**
- * Cloudflare Turnstile — główna ochrona przed botami. Działa „fail closed”:
- * brak tokenu, brak sekretu, odmowa, timeout albo błąd Siteverify oznaczają
- * odrzucenie zgłoszenia. Token jest jednorazowy i ważny 5 minut; po każdej
- * nieudanej wysyłce formularz pobiera nowy.
+ * Cloudflare Turnstile (turnstile.ts): Siteverify z wiązaniem akcji
+ * „wycena” i hosta z TURNSTILE_ALLOWED_HOSTNAMES. Działa „fail closed”.
+ * Token jest jednorazowy i ważny 5 minut; po każdej nieudanej wysyłce
+ * formularz pobiera nowy.
  */
-export async function verifyTurnstile(req: Request, token: FormDataEntryValue | null) {
-  const secret = process.env.TURNSTILE_SECRET_KEY;
-  if (!secret) {
-    console.error("[wycena] Turnstile: brak TURNSTILE_SECRET_KEY — zgłoszenie odrzucone");
-    return false;
-  }
-  if (typeof token !== "string" || !token || token.length > MAX_TOKEN_LENGTH) return false;
-
-  const body = new URLSearchParams({ secret, response: token });
-  const ip = clientIp(req);
-  if (ip) body.set("remoteip", ip);
-
-  try {
-    const res = await fetch(SITEVERIFY_URL, {
-      method: "POST",
-      body,
-      cache: "no-store",
-      signal: AbortSignal.timeout(SITEVERIFY_TIMEOUT_MS),
-    });
-    const data: unknown = await res.json().catch(() => null);
-    const result = (data ?? {}) as { success?: unknown; "error-codes"?: unknown };
-    if (!res.ok || result.success !== true) {
-      /* W logu tylko kody błędów Cloudflare — bez tokenu i sekretu. */
-      const codes = Array.isArray(result["error-codes"])
-        ? result["error-codes"].filter((c) => typeof c === "string" && /^[\w-]{1,40}$/.test(c))
-        : [];
-      console.error(
-        `[wycena] Turnstile odrzucił zgłoszenie: HTTP ${res.status}${codes.length ? ` (${codes.join(", ")})` : ""}`,
-      );
-      return false;
-    }
-    return true;
-  } catch (e) {
-    const timeout = e instanceof Error && e.name === "TimeoutError";
-    console.error(`[wycena] Turnstile: ${timeout ? "przekroczony czas odpowiedzi" : "brak połączenia z"} Siteverify`);
-    return false;
-  }
+export function verifyTurnstile(req: Request, token: FormDataEntryValue | null) {
+  return verifyTurnstileToken(token, clientIp(req), {
+    TURNSTILE_SECRET_KEY: process.env.TURNSTILE_SECRET_KEY,
+    TURNSTILE_ALLOWED_HOSTNAMES: process.env.TURNSTILE_ALLOWED_HOSTNAMES,
+    VERCEL_ENV: process.env.VERCEL_ENV,
+  });
 }
 
 /* ---------------------------------------------------------------- *
