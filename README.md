@@ -46,10 +46,13 @@ z `CONTACT_TO`. To tylko powiadomienie: brak zmiennych `RESEND_API_KEY`,
 `CONTACT_TO`, `CONTACT_FROM` albo błąd Resend nie zmienia wyniku formularza.
 
 Przed zapisem zgłoszenie musi przejść Cloudflare Turnstile
-(`NEXT_PUBLIC_TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY`). Weryfikacja działa
-„fail closed”: bez tokenu, bez sekretu albo przy błędzie Siteverify API zwraca
-`VERIFICATION_FAILED` i nie wywołuje Google ani Resend. Lokalnie można użyć
-kluczy testowych Cloudflare (patrz `.env.example`).
+(`NEXT_PUBLIC_TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY`,
+`TURNSTILE_ALLOWED_HOSTNAMES`). Weryfikacja działa „fail closed”: bez tokenu,
+bez sekretu, bez listy hostów, przy błędzie Siteverify, innej akcji niż
+`wycena` albo hoście spoza `TURNSTILE_ALLOWED_HOSTNAMES` API zwraca
+`VERIFICATION_FAILED` i nie wywołuje Google ani Resend. Po podpięciu nowej
+domeny trzeba ją dopisać do `TURNSTILE_ALLOWED_HOSTNAMES` (i zrobić redeploy).
+Lokalnie można użyć kluczy testowych Cloudflare (patrz `.env.example`).
 
 Limit zapytań: głównym limiterem jest reguła Vercel WAF dla
 `POST /api/wycena` (ustawiana w panelu Vercel, nie w repozytorium). W kodzie
